@@ -1,0 +1,10 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/VisualPinball.net2017/v15
+/Release
+/VisualPinball.net2017.vcxproj.user
+/vpinball_i.h
+/vpinball_i.c
+/vpinball.tlb

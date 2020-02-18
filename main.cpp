@@ -10,10 +10,16 @@
 
 #include "resource.h"
 #include <initguid.h>
+#include <stdio.h>
+#include <iostream>
 
 #define  SET_CRT_DEBUG_FIELD(a)   _CrtSetDbgFlag((a) | _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG))
 
 #include "vpinball_i.c"
+
+//Force config for cab mode
+#include "forceconfig.h"
+
 
 #ifdef CRASH_HANDLER
 extern "C" int __cdecl _purecall(void)
@@ -299,7 +305,31 @@ public:
              continue;
          }
 
-         //
+         //Force config for cab mode
+
+		 if (lstrcmpi(szArglist[i], _T("-ForceDT")) == 0 || lstrcmpi(szArglist[i], _T("/ForceDT")) == 0)
+		 {
+			 g_ForceConfig.forceDT = true;
+			 printf("forceDT\n");
+			 std::cout << std::flush;
+			 continue;
+		 }
+		 if (lstrcmpi(szArglist[i], _T("-ForceFS")) == 0 || lstrcmpi(szArglist[i], _T("/ForceFS")) == 0)
+		 {
+			 g_ForceConfig.forceFS = true;
+			 printf("forceFS\n");
+			 std::cout << std::flush;
+			 continue;
+		 }
+		 if (lstrcmpi(szArglist[i], _T("-ForceFSS")) == 0 || lstrcmpi(szArglist[i], _T("/ForceFSS")) == 0)
+		 {
+			 g_ForceConfig.forceFSS = true;
+			 printf("ForceFSS\n");
+			 std::cout << std::flush;
+			 continue;
+		 }
+
+
 
          bool useCustomParams = false;
          int customIdx = 1;
@@ -373,10 +403,10 @@ public:
                   SetCurrentDirectory(szLoadDir);
                }
 
-            if (playfile || extractpov || extractscript)
-               VPinball::SetOpenMinimized();
+			if (playfile || extractpov || extractscript)
+				VPinball::SetOpenMinimized();
 
-            ++i; // two params processed
+			++i; // two params processed
 
             if (extractpov || extractscript)
                break;

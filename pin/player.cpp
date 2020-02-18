@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include <algorithm>
 #include <time.h>
+#include <stdio.h>
+#include <iostream>
 #include "../meshes/ballMesh.h"
 #include "BallShader.h"
 
@@ -1243,6 +1245,11 @@ HRESULT Player::Init(PinTable * const ptable, const HWND hwndProgress, const HWN
 {
    TRACE_FUNCTION();
 
+   //Inform any frontend
+   printf("Player Init\n");
+   //and flush stdio at once.
+   std::cout << std::flush;
+
    m_ptable = ptable;
 
    //m_hSongCompletionEvent = CreateEvent( NULL, TRUE, FALSE, NULL );
@@ -1676,6 +1683,11 @@ HRESULT Player::Init(PinTable * const ptable, const HWND hwndProgress, const HWN
    // time to reveal the playfield. 
    UINT nMsgID = RegisterWindowMessage(_T("VPTableStart"));
 	::PostMessage(HWND_BROADCAST, nMsgID, NULL, NULL);
+
+	//Inform any frontend
+	printf("VPTableStart\n");
+	//flush stdio at once.
+	std::cout << std::flush;
  
    return S_OK;
 }
