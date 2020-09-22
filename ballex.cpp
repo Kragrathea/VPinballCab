@@ -32,7 +32,7 @@ STDMETHODIMP BallEx::get_X(float *pVal)
 {
    CHECKSTALEBALL
 
-   *pVal = m_pball->m_pos.x;
+   *pVal = m_pball->m_d.m_pos.x;
 
    return S_OK;
 }
@@ -41,7 +41,7 @@ STDMETHODIMP BallEx::put_X(float newVal)
 {
    CHECKSTALEBALL
 
-   m_pball->m_pos.x = newVal;
+   m_pball->m_d.m_pos.x = newVal;
 
    return S_OK;
 }
@@ -50,7 +50,7 @@ STDMETHODIMP BallEx::get_Y(float *pVal)
 {
    CHECKSTALEBALL
 
-   *pVal = m_pball->m_pos.y;
+   *pVal = m_pball->m_d.m_pos.y;
 
    return S_OK;
 }
@@ -59,7 +59,7 @@ STDMETHODIMP BallEx::put_Y(float newVal)
 {
    CHECKSTALEBALL
 
-   m_pball->m_pos.y = newVal;
+   m_pball->m_d.m_pos.y = newVal;
 
    return S_OK;
 }
@@ -68,7 +68,7 @@ STDMETHODIMP BallEx::get_VelX(float *pVal)
 {
    CHECKSTALEBALL
 
-   *pVal = m_pball->m_vel.x;
+   *pVal = m_pball->m_d.m_vel.x;
 
    return S_OK;
 }
@@ -77,7 +77,7 @@ STDMETHODIMP BallEx::put_VelX(float newVal)
 {
    CHECKSTALEBALL
 
-   m_pball->m_vel.x = newVal;
+   m_pball->m_d.m_vel.x = newVal;
 
    return S_OK;
 }
@@ -86,7 +86,7 @@ STDMETHODIMP BallEx::get_VelY(float *pVal)
 {
    CHECKSTALEBALL
 
-   *pVal = m_pball->m_vel.y;
+   *pVal = m_pball->m_d.m_vel.y;
 
    return S_OK;
 }
@@ -95,7 +95,7 @@ STDMETHODIMP BallEx::put_VelY(float newVal)
 {
    CHECKSTALEBALL
 
-   m_pball->m_vel.y = newVal;
+   m_pball->m_d.m_vel.y = newVal;
 
    return S_OK;
 }
@@ -104,7 +104,7 @@ STDMETHODIMP BallEx::get_Z(float *pVal)
 {
    CHECKSTALEBALL
 
-   *pVal = m_pball->m_pos.z;
+   *pVal = m_pball->m_d.m_pos.z;
 
    return S_OK;
 }
@@ -113,7 +113,7 @@ STDMETHODIMP BallEx::put_Z(float newVal)
 {
    CHECKSTALEBALL
 
-   m_pball->m_pos.z = newVal;
+   m_pball->m_d.m_pos.z = newVal;
 
    return S_OK;
 }
@@ -122,7 +122,7 @@ STDMETHODIMP BallEx::get_VelZ(float *pVal)
 {
    CHECKSTALEBALL
 
-   *pVal = m_pball->m_vel.z;
+   *pVal = m_pball->m_d.m_vel.z;
 
    return S_OK;
 }
@@ -131,7 +131,7 @@ STDMETHODIMP BallEx::put_VelZ(float newVal)
 {
    CHECKSTALEBALL
 
-   m_pball->m_vel.z = newVal;
+   m_pball->m_d.m_vel.z = newVal;
 
    return S_OK;
 }
@@ -237,9 +237,8 @@ STDMETHODIMP BallEx::put_Color(OLE_COLOR newVal)
 
 STDMETHODIMP BallEx::get_Image(BSTR *pVal)
 {
-   WCHAR wz[512];
-
-   MultiByteToWideChar(CP_ACP, 0, m_pball->m_szImage, -1, wz, MAXNAMEBUFFER);
+   WCHAR wz[MAXTOKEN];
+   MultiByteToWideChar(CP_ACP, 0, m_pball->m_szImage, -1, wz, MAXTOKEN);
    *pVal = SysAllocString(wz);
 
    return S_OK;
@@ -247,7 +246,7 @@ STDMETHODIMP BallEx::get_Image(BSTR *pVal)
 
 STDMETHODIMP BallEx::put_Image(BSTR newVal)
 {
-   WideCharToMultiByte(CP_ACP, 0, newVal, -1, m_pball->m_szImage, MAXNAMEBUFFER, NULL, NULL);
+   WideCharToMultiByte(CP_ACP, 0, newVal, -1, m_pball->m_szImage, MAXTOKEN, NULL, NULL);
 
    m_pball->m_pinballEnv = g_pplayer->m_ptable->GetImage(m_pball->m_szImage);
    m_pball->RenderSetup(); // nowadays does not do anything, but call it in case this changes in the future
@@ -270,9 +269,8 @@ HRESULT BallEx::put_UserValue(VARIANT *newVal)
 
 STDMETHODIMP BallEx::get_FrontDecal(BSTR *pVal)
 {
-   WCHAR wz[512];
-
-   MultiByteToWideChar(CP_ACP, 0, m_pball->m_szImageDecal, -1, wz, MAXNAMEBUFFER);
+   WCHAR wz[MAXTOKEN];
+   MultiByteToWideChar(CP_ACP, 0, m_pball->m_szImageDecal, -1, wz, MAXTOKEN);
    *pVal = SysAllocString(wz);
 
    return S_OK;
@@ -280,8 +278,8 @@ STDMETHODIMP BallEx::get_FrontDecal(BSTR *pVal)
 
 STDMETHODIMP BallEx::put_FrontDecal(BSTR newVal)
 {
-   char szImage[MAXTOKEN];
-   WideCharToMultiByte(CP_ACP, 0, newVal, -1, szImage, MAXNAMEBUFFER, NULL, NULL);
+   char szImage[sizeof(m_pball->m_szImageDecal)];
+   WideCharToMultiByte(CP_ACP, 0, newVal, -1, szImage, sizeof(m_pball->m_szImageDecal), NULL, NULL);
    Texture * const tex = g_pplayer->m_ptable->GetImage(szImage);
    if (tex && tex->IsHDR())
    {
@@ -289,7 +287,7 @@ STDMETHODIMP BallEx::put_FrontDecal(BSTR newVal)
        return E_FAIL;
    }
 
-   strcpy_s(m_pball->m_szImageDecal, szImage);
+   strncpy_s(m_pball->m_szImageDecal, szImage, sizeof(m_pball->m_szImageDecal)-1);
 
    m_pball->m_pinballDecal = tex;
 
@@ -325,7 +323,7 @@ STDMETHODIMP BallEx::get_Mass(float *pVal)
 {
    CHECKSTALEBALL
 
-   *pVal = m_pball->m_mass;
+   *pVal = m_pball->m_d.m_mass;
 
    return S_OK;
 }
@@ -334,7 +332,7 @@ STDMETHODIMP BallEx::put_Mass(float newVal)
 {
    CHECKSTALEBALL
 
-   m_pball->m_mass = newVal;
+   m_pball->m_d.m_mass = newVal;
 
    return S_OK;
 }
@@ -361,7 +359,7 @@ STDMETHODIMP BallEx::get_Radius(float *pVal)
 {
    CHECKSTALEBALL
 
-   *pVal = m_pball->m_radius;
+   *pVal = m_pball->m_d.m_radius;
 
    return S_OK;
 }
@@ -370,7 +368,7 @@ STDMETHODIMP BallEx::put_Radius(float newVal)
 {
    CHECKSTALEBALL
 
-   m_pball->m_radius = newVal;
+   m_pball->m_d.m_radius = newVal;
 
    return S_OK;
 }

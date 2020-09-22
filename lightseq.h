@@ -15,7 +15,7 @@ class LightSeqData
 public:
    Vertex2D      m_v;
    Vertex2D      m_vCenter;
-   WCHAR         m_wzCollection[MAXNAMEBUFFER];	// collection to use
+   std::basic_string<WCHAR> m_wzCollection;
    long          m_updateinterval;
    TimerDataRoot m_tdr;
 };
@@ -183,7 +183,14 @@ public:
 
    void     Animate();
 
-   LightSeqAnimObject m_lightseqanim;
+   class LightSeqAnimObject : public AnimObject
+   {
+   public:
+      virtual void Animate() { m_pLightSeq->Animate(); } // this function is called every frame to animate the object/light sequence
+
+      LightSeq *m_pLightSeq;
+   } m_lightseqanim;
+
    LightSeqData m_d;
 
 private:

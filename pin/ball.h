@@ -14,6 +14,15 @@ public:
    Ball *m_pball;
 };
 
+struct BallS
+{
+   vector<IFireEvents*>* m_vpVolObjs; // vector of triggers and kickers we are now inside (stored as IFireEvents* though, as HitObject.m_obj stores it like that!)
+   Vertex3Ds m_pos;
+   Vertex3Ds m_vel; // ball velocity
+   float m_radius;
+   float m_mass;
+   bool m_frozen;
+};
 
 class Ball : public HitObject
 {
@@ -27,7 +36,7 @@ public:
    void UpdateVelocities();
 
    // From HitObject
-   virtual float HitTest(const Ball * const pball, const float dtime, CollisionEvent& coll) const;
+   virtual float HitTest(const BallS& ball, const float dtime, CollisionEvent& coll) const;
    virtual int GetType() const { return eBall; }
    virtual void Collide(const CollisionEvent& coll);
    virtual void Contact(CollisionEvent& coll, const float dtime) { }
@@ -41,40 +50,33 @@ public:
 
    Vertex3Ds SurfaceVelocity(const Vertex3Ds& surfP) const;
    Vertex3Ds SurfaceAcceleration(const Vertex3Ds& surfP) const;
-   float Inertia() const { return (float)(2.0/5.0) * m_radius*m_radius * m_mass; }
+   float Inertia() const { return (float)(2.0/5.0) * m_d.m_radius*m_d.m_radius * m_d.m_mass; }
 
    void ApplySurfaceImpulse(const Vertex3Ds& rotI, const Vertex3Ds& impulse);
 
    void EnsureOMObject();
 
    // Per frame info
-   CCO(BallEx) *m_pballex; // Object model version of the ball
+   CCO(BallEx) *m_pballex;   // Object model version of the ball
 
-   vector<IFireEvents*>* m_vpVolObjs; // vector of triggers and kickers we are now inside (stored as IFireEvents* though, as HitObject.m_obj stores it like that!)
+   CollisionEvent m_coll;    // collision information, may not be a actual hit if something else happens first
 
-   CollisionEvent m_coll;  // collision information, may not be a actual hit if something else happens first
+   BallMoverObject m_mover;
 
-#ifdef C_DYNAMIC
-   int m_dynamic;          // used to determine static ball conditions and velocity quenching
-   float m_drsq;           // square of distance moved
-#endif
+   BallS m_d;
 
-   BallMoverObject m_ballMover;
+   Vertex3Ds m_oldVel;       // hack for kicker hole handling only
 
-   Vertex3Ds m_pos;
-   Vertex3Ds m_vel;        // ball velocity
-   Vertex3Ds m_oldVel;     // hack for kicker hole handling only
-
-   float m_radius;
-   float m_mass;
-
-   Vertex3Ds m_Event_Pos;  // last hit event position (to filter hit 'equal' hit events)
+   Vertex3Ds m_lastEventPos; // last hit event position (to filter hit 'equal' hit events)
 
    Vertex3Ds m_angularmomentum;
 
-   unsigned int m_id; // unique ID for each ball
+#ifdef C_DYNAMIC
+   int m_dynamic;            // used to determine static ball conditions and velocity quenching
+   float m_drsq;             // square of distance moved
+#endif
 
-   bool m_frozen;
+   unsigned int m_id;        // unique ID for each ball
 
    // rendering only:
    bool m_reflectionEnabled;

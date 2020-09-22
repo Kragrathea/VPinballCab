@@ -233,7 +233,7 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
       <HeaderFileName />
     </Midl>
     <ClCompile>
-      <Optimization>Full</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -279,6 +279,7 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
       <AdditionalOptions>/SAFESEH:NO
  %(AdditionalOptions)</AdditionalOptions>
       <LargeAddressAware>true</LargeAddressAware>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PostBuildEvent>
       <Command>
@@ -299,7 +300,7 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
       </HeaderFileName>
     </Midl>
     <ClCompile>
-      <Optimization>Full</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
@@ -345,6 +346,7 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
       <AdditionalOptions>/SAFESEH:NO
  %(AdditionalOptions)</AdditionalOptions>
       <LargeAddressAware>true</LargeAddressAware>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
     <PostBuildEvent>
       <Command>%40echo off
@@ -391,7 +393,7 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
     <ClCompile Include="dialogs\Properties\HitTargetVisualsProperty.cpp" />
     <ClCompile Include="dialogs\Properties\KickerPhysicsProperty.cpp" />
     <ClCompile Include="dialogs\Properties\KickerVisualsProperty.cpp" />
-    <ClCompile Include="dialogs\Properties\LichtseqStatesProperty.cpp" />
+    <ClCompile Include="dialogs\Properties\LightseqStatesProperty.cpp" />
     <ClCompile Include="dialogs\Properties\LightStatesProperty.cpp" />
     <ClCompile Include="dialogs\Properties\LightVisualsProperty.cpp" />
     <ClCompile Include="dialogs\Properties\PlungerPhysicsProperty.cpp" />
@@ -422,6 +424,12 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
     <ClCompile Include="dialogs\VideoOptionsDialog.cpp" />
     <ClCompile Include="flasher.cpp" />
     <ClCompile Include="hittarget.cpp" />
+    <ClCompile Include="imgui\imgui.cpp" />
+    <ClCompile Include="imgui\imgui_draw.cpp" />
+    <ClCompile Include="imgui\imgui_impl_dx9.cpp" />
+    <ClCompile Include="imgui\imgui_impl_win32.cpp" />
+    <ClCompile Include="imgui\imgui_widgets.cpp" />
+    <ClCompile Include="imgui\implot\implot.cpp" />
     <ClCompile Include="inc\gpuprofiler.cpp" />
     <ClCompile Include="inc\miniz.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -1144,6 +1152,7 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
     <ClInclude Include="codeview.h" />
     <ClInclude Include="codeviewedit.h" />
     <ClInclude Include="CrashHandler.h" />
+    <ClInclude Include="Debugger.h" />
     <ClInclude Include="decal.h" />
     <ClInclude Include="def.h" />
     <ClInclude Include="Dialogs\AboutDialog.h" />
@@ -1221,6 +1230,12 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
     <ClInclude Include="hittarget.h" />
     <ClInclude Include="idebug.h" />
     <ClInclude Include="ieditable.h" />
+    <ClInclude Include="imgui\imconfig.h" />
+    <ClInclude Include="imgui\imgui.h" />
+    <ClInclude Include="imgui\imgui_impl_dx9.h" />
+    <ClInclude Include="imgui\imgui_impl_win32.h" />
+    <ClInclude Include="imgui\imgui_internal.h" />
+    <ClInclude Include="imgui\implot\implot.h" />
     <ClInclude Include="inc\bass.h" />
     <ClInclude Include="inc\forsyth.h" />
     <ClInclude Include="inc\freeimage.h" />
@@ -1241,6 +1256,7 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
     <ClInclude Include="inc\scilexer.h" />
     <ClInclude Include="inc\scintilla.h" />
     <ClInclude Include="inc\Sci_Position.h" />
+    <ClInclude Include="inc\stb_image.h" />
     <ClInclude Include="inc\ThreadPool.h" />
     <ClInclude Include="inc\win32xx\include\wxx_appcore.h" />
     <ClInclude Include="inc\win32xx\include\wxx_appcore0.h" />

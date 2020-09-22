@@ -134,13 +134,14 @@ inline void ref_count_trigger(const ULONG r, const char *file, const int line) /
 #ifdef DEBUG_REFCOUNT_TRIGGER
    char msg[128];
    sprintf_s(msg, 128, "Ref Count: %u at %s:%d", r, file, line);
-   MessageBox(NULL, msg, "Error", MB_OK | MB_ICONEXCLAMATION);
+   /*g_pvp->*/MessageBox(NULL, msg, "Error", MB_OK | MB_ICONEXCLAMATION);
 #endif
 }
 #define SAFE_RELEASE(p)			{ if(p) { const ULONG rcc = (p)->Release(); if(rcc != 0) ref_count_trigger(rcc, __FILE__, __LINE__); (p)=NULL; } }
 #define SAFE_RELEASE_NO_SET(p)	{ if(p) { const ULONG rcc = (p)->Release(); if(rcc != 0) ref_count_trigger(rcc, __FILE__, __LINE__); } }
 #define SAFE_RELEASE_NO_CHECK_NO_SET(p)	{ const ULONG rcc = (p)->Release(); if(rcc != 0) ref_count_trigger(rcc, __FILE__, __LINE__); }
 #define SAFE_RELEASE_NO_RCC(p)	{ if(p) { (p)->Release(); (p)=NULL; } } // use for releasing things like surfaces gotten from GetSurfaceLevel (that seem to "share" the refcount with the underlying texture)
+#define FORCE_RELEASE(p)		{ if(p) { ULONG rcc = 1; while(rcc!=0) {rcc = (p)->Release();} (p)=NULL; } } // release all references until it is 0
 
 #define hrNotImplemented ResultFromScode(E_NOTIMPL)
 
@@ -202,7 +203,7 @@ class LocalStringW
 public:
    LocalStringW(const int resid);
 
-   WCHAR str[256];
+   WCHAR m_szbuffer[256];
 };
 
 #define M_PI 3.1415926535897932384626433832795
@@ -285,6 +286,10 @@ __forceinline bool sign(const float a)
    return (float_as_int(a) & 0x80000000) == 0x80000000;
 }
 
+__forceinline float sgn(const float a)
+{
+   return (a > 0.f) ? 1.f : ((a < 0.f) ? -1.f : 0.f);
+}
 //
 // TinyMT64 for random numbers (much better than rand())
 //
@@ -334,6 +339,21 @@ __forceinline float radical_inverse(unsigned int v)
    return (float)v * 0.00000000023283064365386962890625f; // /2^32
 }
 
+template <unsigned int base>
+float radical_inverse(unsigned int a) {
+    const float invBase = (float)(1. / (double)base);
+    unsigned int reversedDigits = 0;
+    float invBaseN = 1.f;
+    while (a) {
+        const unsigned int next  = a / base;
+        const unsigned int digit = a - next * base;
+        reversedDigits = reversedDigits * base + digit;
+        invBaseN *= invBase;
+        a = next;
+    }
+    return (float)((double)reversedDigits * invBaseN);
+}
+
 __forceinline float sobol(unsigned int i, unsigned int scramble = 0)
 {
    for (unsigned int v = 1u << 31; (i != 0); i >>= 1, v ^= v >> 1) if (i & 1)
@@ -377,8 +397,8 @@ __forceinline float millimetersToVPUnits(const float value)
    return value * (float)(1.0/0.540425);
 }
 
-float sz2f(const char * const sz);
-void f2sz(const float f, char * const sz);
+float sz2f(const string& sz);
+void f2sz(const float f, string& sz);
 
 void WideStrCopy(const WCHAR *wzin, WCHAR *wzout);
 void WideStrNCopy(const WCHAR *wzin, WCHAR *wzout, const DWORD wzoutMaxLen);
@@ -387,7 +407,9 @@ int WzSzStrCmp(const WCHAR *wz1, const char *sz2);
 void WideStrCat(const WCHAR *wzin, WCHAR *wzout);
 int WzSzStrnCmp(const WCHAR *wz1, const char *sz2, const int count);
 
-HRESULT OpenURL(const char * const szURL);
+HRESULT OpenURL(const string& szURL);
 
-WCHAR *MakeWide(const char * const sz);
+WCHAR *MakeWide(const string& sz);
 char *MakeChar(const WCHAR * const wz);
+
+char* replace(const char* const original, const char* const pattern, const char* const replacement);

@@ -10,13 +10,14 @@
 #include "inc\ThreadPool.h"
 
 // defined in objloader.cpp
-extern bool WaveFrontObj_Load(const char *filename, const bool flipTv, const bool convertToLeftHanded);
+extern bool WaveFrontObj_Load(const string& filename, const bool flipTv, const bool convertToLeftHanded);
 extern void WaveFrontObj_GetVertices(std::vector<Vertex3D_NoTex2>& verts);
 extern void WaveFrontObj_GetIndices(std::vector<unsigned int>& list);
-extern void WaveFrontObj_Save(const char *filename, const char *description, const Mesh& mesh);
+extern void WaveFrontObj_Save(const string& filename, const string& description, const Mesh& mesh);
 //
 
 ThreadPool *g_pPrimitiveDecompressThreadPool = NULL;
+extern int logicalNumberOfProcessors;
 
 void Mesh::Clear()
 {
@@ -50,7 +51,7 @@ bool Mesh::LoadAnimation(const char *fname, const bool flipTV, const bool conver
    {
       do
       {
-         allFiles.push_back(string(data.cFileName));
+         allFiles.push_back(data.cFileName);
          frameCounter++;
       } while (FindNextFile(h, &data));
    }
@@ -58,7 +59,7 @@ bool Mesh::LoadAnimation(const char *fname, const bool flipTV, const bool conver
    for (size_t i = 0; i < allFiles.size(); i++)
    {
       sname = allFiles[i];
-      if (WaveFrontObj_Load(sname.c_str(), flipTV, convertToLeftHanded))
+      if (WaveFrontObj_Load(sname, flipTV, convertToLeftHanded))
       {
          std::vector<Vertex3D_NoTex2> verts;
          WaveFrontObj_GetVertices(verts);
@@ -73,17 +74,17 @@ bool Mesh::LoadAnimation(const char *fname, const bool flipTV, const bool conver
       else
       {
          name = "Unable to load file " + sname;
-         ShowError(name.c_str());
+         ShowError(name);
          return false;
       }
 
    }
-   sname = std::to_string((long long)frameCounter)+" frames imported!";
+   sname = std::to_string(frameCounter)+" frames imported!";
    g_pvp->MessageBox(sname.c_str(), "Info", MB_OK | MB_ICONEXCLAMATION);
    return true;
 }
 
-bool Mesh::LoadWavefrontObj(const char *fname, const bool flipTV, const bool convertToLeftHanded)
+bool Mesh::LoadWavefrontObj(const string& fname, const bool flipTV, const bool convertToLeftHanded)
 {
    Clear();
 
@@ -114,12 +115,9 @@ bool Mesh::LoadWavefrontObj(const char *fname, const bool flipTV, const bool con
       return false;
 }
 
-void Mesh::SaveWavefrontObj(const char *fname, const char *description)
+void Mesh::SaveWavefrontObj(const string& fname, const string& description)
 {
-   if (description == NULL)
-      description = fname;
-
-   WaveFrontObj_Save(fname, description, *this);
+   WaveFrontObj_Save(fname, description.empty() ? fname : description, *this);
 }
 
 void Mesh::UploadToVB(VertexBuffer * vb, const float frame) 
@@ -171,7 +169,6 @@ Primitive::Primitive()
    m_vertexBufferRegenerate = true;
    m_indexBuffer = 0;
    m_d.m_use3DMesh = false;
-   m_d.m_meshFileName[0] = 0;
    m_d.m_staticRendering = false;
    m_d.m_edgeFactorUI = 0.25f;
    m_d.m_collision_reductionFactor = 0.f;
@@ -187,10 +184,7 @@ Primitive::Primitive()
    m_propPhysics = NULL;
    m_propPosition = NULL;
    m_propVisual = NULL;
-   memset(m_d.m_szImage, 0, MAXTOKEN);
-   memset(m_d.m_szNormalMap, 0, MAXTOKEN);
-   memset(m_d.m_szMaterial, 0, MAXNAMEBUFFER);
-   memset(m_d.m_szPhysicsMaterial, 0, MAXNAMEBUFFER);
+   memset(m_d.m_szNormalMap, 0, sizeof(m_d.m_szNormalMap));
    m_d.m_overwritePhysics = true;
    m_d.m_useAsPlayfield = false;
 }
@@ -324,10 +318,7 @@ HRESULT Primitive::Init(PinTable *ptable, float x, float y, bool fromMouseClick)
 
    InitVBA(fTrue, 0, NULL);
 
-   if (!m_d.m_use3DMesh)
-      CalculateBuiltinOriginal();
-
-   UpdateEditorView();
+   UpdateStatusBarInfo();
 
    return S_OK;
 }
@@ -339,7 +330,7 @@ void Primitive::SetDefaults(bool fromMouseClick)
    m_d.m_useAsPlayfield = false;
    m_d.m_use3DMesh = false;
 
-   m_d.m_meshFileName[0] = 0;
+   m_d.m_meshFileName.clear();
    // sides
    m_d.m_Sides = fromMouseClick ? LoadValueIntWithDefault(strKeyName, "Sides", 4) : 4;
    if (m_d.m_Sides > Max_Primitive_Sides)
@@ -371,9 +362,12 @@ void Primitive::SetDefaults(bool fromMouseClick)
    m_d.m_aRotAndTra[7] = fromMouseClick ? LoadValueFloatWithDefault(strKeyName, "RotAndTra7", 0.0f) : 0.0f;
    m_d.m_aRotAndTra[8] = fromMouseClick ? LoadValueFloatWithDefault(strKeyName, "RotAndTra8", 0.0f) : 0.0f;
 
-   HRESULT hr = LoadValueString(strKeyName, "Image", m_d.m_szImage, MAXTOKEN);
+   char buf[MAXTOKEN] = { 0 };
+   HRESULT hr = LoadValueString(strKeyName, "Image", buf, MAXTOKEN);
    if ((hr != S_OK) && fromMouseClick)
-      m_d.m_szImage[0] = 0;
+      m_d.m_szImage = "";
+   else
+      m_d.m_szImage = buf;
 
    hr = LoadValueString(strKeyName, "NormalMap", m_d.m_szNormalMap, MAXTOKEN);
    if ((hr != S_OK) && fromMouseClick)
@@ -451,8 +445,8 @@ void Primitive::GetTimers(vector<HitTimer*> &pvht)
 
 void Primitive::GetHitShapes(vector<HitObject*> &pvho)
 {
-   char name[MAX_PATH];
-   WideCharToMultiByte(CP_ACP, 0, m_wzName, -1, name, MAX_PATH, NULL, NULL);
+   char name[sizeof(m_wzName)/sizeof(m_wzName[0])];
+   WideCharToMultiByte(CP_ACP, 0, m_wzName, -1, name, sizeof(name), NULL, NULL);
    if (strcmp(name, "playfield_mesh") == 0)
    {
       m_d.m_visible = false;
@@ -470,7 +464,7 @@ void Primitive::GetHitShapes(vector<HitObject*> &pvho)
 
    //
 
-   const unsigned int reduced_vertices = max((unsigned int)powf((float)m_vertices.size(), clamp(1.f - m_d.m_collision_reductionFactor, 0.f, 1.f)*0.25f + 0.75f), 420u); //!! 420 = magic
+   const unsigned int reduced_vertices = max((unsigned int)pow((double)m_vertices.size(), clamp(1.f - m_d.m_collision_reductionFactor, 0.f, 1.f)*0.25f + 0.75f), 420u); //!! 420 = magic
 
    if (reduced_vertices < m_vertices.size())
    {
@@ -792,7 +786,7 @@ void Primitive::UIRenderPass2(Sur * const psur)
       Texture * const ppi = m_ptable->GetImage(m_d.m_szImage);
       if (ppi)
       {
-         ppi->EnsureHBitmap();
+         ppi->CreateGDIVersion();
          if (ppi->m_hbmGDIVersion)
          {
             std::vector<RenderVertex> vvertex;
@@ -915,6 +909,9 @@ void Primitive::RenderBlueprint(Sur *psur, const bool solid)
 
 void Primitive::CalculateBuiltinOriginal()
 {
+    if (m_d.m_use3DMesh)
+        return;
+
    // this recalculates the Original Vertices -> should be only called, when sides are altered.
    const float outerRadius = -0.5f / (cosf((float)M_PI / (float)m_d.m_Sides));
    const float addAngle = (float)(2.0*M_PI) / (float)m_d.m_Sides;
@@ -1101,32 +1098,27 @@ void Primitive::CalculateBuiltinOriginal()
    //ComputeNormals(m_mesh.m_vertices, m_mesh.m_indices);
 }
 
-// placed in get_X so that this is shown when prim selected
-void Primitive::UpdateMeshInfo()
+void Primitive::UpdateStatusBarInfo()
 {
-    if(g_pplayer)
-        return;
-
-    char tbuf[128];
-    sprintf_s(tbuf, "vertices: %i | polygons: %i", (int)m_mesh.NumVertices(), (int)m_mesh.NumIndices());
-    g_pvp->SetStatusBarUnitInfo(tbuf, false);
-}
-
-void Primitive::UpdateEditorView()
-{
-    if(g_pplayer)
-        return;
-
+   CalculateBuiltinOriginal();
    RecalculateMatrices();
    TransformVertices();
+   if (m_d.m_use3DMesh)
+   {
+       const string tbuf = "Vertices: " + std::to_string(m_mesh.NumVertices()) + " | Polygons: " + std::to_string(m_mesh.NumIndices());
+       m_vpinball->SetStatusBarUnitInfo(tbuf, false);
+   }
+   else
+       m_vpinball->SetStatusBarUnitInfo("", false);
+
 }
 
 void Primitive::ExportMesh(FILE *f)
 {
-   char name[MAX_PATH];
    if (m_d.m_visible)
    {
-      WideCharToMultiByte(CP_ACP, 0, m_wzName, -1, name, MAX_PATH, NULL, NULL);
+      char name[sizeof(m_wzName)/sizeof(m_wzName[0])];
+      WideCharToMultiByte(CP_ACP, 0, m_wzName, -1, name, sizeof(name), NULL, NULL);
       Vertex3D_NoTex2 *const buf = new Vertex3D_NoTex2[m_mesh.NumVertices()];
       RecalculateMatrices();
       for (size_t i = 0; i < m_mesh.NumVertices(); i++)
@@ -1149,7 +1141,7 @@ void Primitive::ExportMesh(FILE *f)
       WaveFrontObj_WriteObjectName(f, name);
       WaveFrontObj_WriteVertexInfo(f, buf, (unsigned int)m_mesh.NumVertices());
       const Material * const mat = m_ptable->GetMaterial(m_d.m_szMaterial);
-      WaveFrontObj_WriteMaterial(m_d.m_szMaterial, NULL, mat);
+      WaveFrontObj_WriteMaterial(m_d.m_szMaterial, string(), mat);
       WaveFrontObj_UseTexture(f, m_d.m_szMaterial);
       WaveFrontObj_WriteFaceInfoLong(f, m_mesh.m_indices);
       WaveFrontObj_UpdateFaceOffset((unsigned int)m_mesh.NumVertices());
@@ -1342,15 +1334,14 @@ void Primitive::RenderStatic()
 
 void Primitive::SetObjectPos()
 {
-   g_pvp->SetObjectPosCur(m_d.m_vPosition.x, m_d.m_vPosition.y);
+    m_vpinball->SetObjectPosCur(m_d.m_vPosition.x, m_d.m_vPosition.y);
 }
 
 void Primitive::MoveOffset(const float dx, const float dy)
 {
    m_d.m_vPosition.x += dx;
    m_d.m_vPosition.y += dy;
-
-   UpdateEditorView();
+   UpdateStatusBarInfo();
 }
 
 Vertex2D Primitive::GetCenter() const
@@ -1362,8 +1353,7 @@ void Primitive::PutCenter(const Vertex2D& pv)
 {
    m_d.m_vPosition.x = pv.x;
    m_d.m_vPosition.y = pv.y;
-
-   UpdateEditorView();
+   UpdateStatusBarInfo();
 }
 
 //////////////////////////////
@@ -1394,7 +1384,7 @@ HRESULT Primitive::SaveData(IStream *pstm, HCRYPTHASH hcrypthash, const bool bac
    bw.WriteString(FID(IMAG), m_d.m_szImage);
    bw.WriteString(FID(NRMA), m_d.m_szNormalMap);
    bw.WriteInt(FID(SIDS), m_d.m_Sides);
-   bw.WriteWideString(FID(NAME), (WCHAR *)m_wzName);
+   bw.WriteWideString(FID(NAME), m_wzName);
    bw.WriteString(FID(MATR), m_d.m_szMaterial);
    bw.WriteInt(FID(SCOL), m_d.m_SideColor);
    bw.WriteBool(FID(TVIS), m_d.m_visible);
@@ -1525,7 +1515,9 @@ HRESULT Primitive::InitLoad(IStream *pstm, PinTable *ptable, int *pid, int versi
 
    if(version < 1011) // so that old tables do the reorderForsyth on each load, new tables only on mesh import, so a simple resave of a old table will also skip this step
    {
-      unsigned int* const tmp = reorderForsyth(m_mesh.m_indices.data(), (int)(m_mesh.NumIndices() / 3), (int)m_mesh.NumVertices());
+      WaitForMeshDecompression(); //!! needed nowadays due to multithreaded mesh decompression
+
+      unsigned int* const tmp = reorderForsyth(m_mesh.m_indices, (int)m_mesh.NumVertices());
       if (tmp != NULL)
       {
          memcpy(m_mesh.m_indices.data(), tmp, m_mesh.NumIndices() * sizeof(unsigned int));
@@ -1555,7 +1547,7 @@ bool Primitive::LoadToken(const int id, BiffReader * const pbr)
    case FID(IMAG): pbr->GetString(m_d.m_szImage); break;
    case FID(NRMA): pbr->GetString(m_d.m_szNormalMap); break;
    case FID(SIDS): pbr->GetInt(&m_d.m_Sides); break;
-   case FID(NAME): pbr->GetWideString((WCHAR *)m_wzName); break;
+   case FID(NAME): pbr->GetWideString(m_wzName); break;
    case FID(MATR): pbr->GetString(m_d.m_szMaterial); break;
    case FID(SCOL): pbr->GetInt(&m_d.m_SideColor); break;
    case FID(TVIS): pbr->GetBool(&m_d.m_visible); break;
@@ -1585,7 +1577,7 @@ bool Primitive::LoadToken(const int id, BiffReader * const pbr)
    case FID(U3DM): pbr->GetBool(&m_d.m_use3DMesh); break;
    case FID(EBFC): pbr->GetBool(&m_d.m_backfacesEnabled); break;
    case FID(DIPT): pbr->GetBool(&m_d.m_displayTexture); break;
-   case FID(M3DN): pbr->GetWideString((WCHAR *)m_d.m_meshFileName); break;
+   case FID(M3DN): pbr->GetString(m_d.m_meshFileName); break;
    case FID(M3VN):
    {
       pbr->GetInt(&m_numVertices);
@@ -1639,7 +1631,7 @@ bool Primitive::LoadToken(const int id, BiffReader * const pbr)
       mz_uint8 * c = (mz_uint8 *)malloc(m_compressedVertices);
       pbr->GetStruct(c, m_compressedVertices);
 	  if (g_pPrimitiveDecompressThreadPool == NULL)
-		  g_pPrimitiveDecompressThreadPool = new ThreadPool(8);
+		  g_pPrimitiveDecompressThreadPool = new ThreadPool(logicalNumberOfProcessors);
 
 	  g_pPrimitiveDecompressThreadPool->enqueue([uclen, c, this] {
 		  mz_ulong uclen2 = uclen;
@@ -1683,7 +1675,7 @@ bool Primitive::LoadToken(const int id, BiffReader * const pbr)
          mz_uint8 * c = (mz_uint8 *)malloc(m_compressedIndices);
          pbr->GetStruct(c, m_compressedIndices);
 		 if (g_pPrimitiveDecompressThreadPool == NULL)
-			 g_pPrimitiveDecompressThreadPool = new ThreadPool(8);
+			 g_pPrimitiveDecompressThreadPool = new ThreadPool(logicalNumberOfProcessors);
 
 		 g_pPrimitiveDecompressThreadPool->enqueue([uclen, c, this] {
 			 mz_ulong uclen2 = uclen;
@@ -1705,7 +1697,7 @@ bool Primitive::LoadToken(const int id, BiffReader * const pbr)
          mz_uint8 * c = (mz_uint8 *)malloc(m_compressedIndices);
          pbr->GetStruct(c, m_compressedIndices);
          if (g_pPrimitiveDecompressThreadPool == NULL)
-            g_pPrimitiveDecompressThreadPool = new ThreadPool(8);
+            g_pPrimitiveDecompressThreadPool = new ThreadPool(logicalNumberOfProcessors);
 
          g_pPrimitiveDecompressThreadPool->enqueue([uclen, c, this] {
             std::vector<WORD> tmp(m_numIndices);
@@ -1747,11 +1739,7 @@ HRESULT Primitive::InitPostLoad()
 {
    WaitForMeshDecompression(); //!! needed nowadays due to multithreaded mesh decompression
 
-
-   if (!m_d.m_use3DMesh)
-      CalculateBuiltinOriginal();
-
-   UpdateEditorView();
+   UpdateStatusBarInfo();
 
    return S_OK;
 }
@@ -1771,6 +1759,7 @@ INT_PTR CALLBACK Primitive::ObjImportProc(HWND hwndDlg, UINT uMsg, WPARAM wParam
       CheckDlgButton(hwndDlg, IDC_REL_POSITION_RADIO, BST_CHECKED);
       CheckDlgButton(hwndDlg, IDC_ABS_POSITION_RADIO, BST_UNCHECKED);
       CheckDlgButton(hwndDlg, IDC_CENTER_MESH, BST_UNCHECKED);
+      CheckDlgButton(hwndDlg, IDC_IMPORT_NO_FORSYTH, BST_UNCHECKED);
       EnableWindow(GetDlgItem(hwndDlg, IDOK), FALSE);
       return TRUE;
    }
@@ -1804,30 +1793,29 @@ INT_PTR CALLBACK Primitive::ObjImportProc(HWND hwndDlg, UINT uMsg, WPARAM wParam
                prim->m_vertexBuffer = 0;
             }
             bool flipTV = false;
-            bool convertToLeftHanded = IsDlgButtonChecked(hwndDlg, IDC_CONVERT_COORD_CHECK) == BST_CHECKED;
-            bool importAbsolutePosition = IsDlgButtonChecked(hwndDlg, IDC_ABS_POSITION_RADIO) == BST_CHECKED;
-            bool centerMesh = IsDlgButtonChecked(hwndDlg, IDC_CENTER_MESH) == BST_CHECKED;
-            bool importMaterial = IsDlgButtonChecked(hwndDlg, IDC_IMPORT_MATERIAL) == BST_CHECKED;
-            bool importAnimation = IsDlgButtonChecked(hwndDlg, IDC_IMPORT_ANIM_SEQUENCE) == BST_CHECKED;
+            const bool convertToLeftHanded = IsDlgButtonChecked(hwndDlg, IDC_CONVERT_COORD_CHECK) == BST_CHECKED;
+            const bool importAbsolutePosition = IsDlgButtonChecked(hwndDlg, IDC_ABS_POSITION_RADIO) == BST_CHECKED;
+            const bool centerMesh = IsDlgButtonChecked(hwndDlg, IDC_CENTER_MESH) == BST_CHECKED;
+            const bool importMaterial = IsDlgButtonChecked(hwndDlg, IDC_IMPORT_MATERIAL) == BST_CHECKED;
+            const bool importAnimation = IsDlgButtonChecked(hwndDlg, IDC_IMPORT_ANIM_SEQUENCE) == BST_CHECKED;
+            const bool doForsyth = IsDlgButtonChecked(hwndDlg, IDC_IMPORT_NO_FORSYTH) == BST_UNCHECKED;
             if (importMaterial)
             {
-               string filename(szFileName);
-               size_t index = filename.find_last_of('.');
-               if (index != -1)
+               string szMatName = szFileName;
+               if (ReplaceExtensionFromFilename(szMatName, "mtl"))
                {
-                  char szMatName[MAXSTRING] = { 0 };
-                  memcpy(szMatName, szFileName, index);
-                  strcat_s(szMatName, ".mtl");
                   Material * const mat = new Material();
-                  if (WaveFrontObjLoadMaterial(szMatName, mat))
+                  if (WaveFrontObj_LoadMaterial(szMatName, mat))
                   {
                      CComObject<PinTable> * const pActiveTable = g_pvp->GetActiveTable();
                      if (pActiveTable)
                          pActiveTable->AddMaterial(mat);
 
-                     strcpy_s(prim->m_d.m_szMaterial, mat->m_szName);
+                     prim->m_d.m_szMaterial = mat->m_szName;
                   }
                }
+               else
+                  ShowError("Could not load material file.");
             }
             if (prim->m_mesh.LoadWavefrontObj(szFileName, flipTV, convertToLeftHanded))
             {
@@ -1868,13 +1856,16 @@ INT_PTR CALLBACK Primitive::ObjImportProc(HWND hwndDlg, UINT uMsg, WPARAM wParam
                   }
                }
                prim->m_d.m_use3DMesh = true;
-               unsigned int* const tmp = reorderForsyth(prim->m_mesh.m_indices.data(), (int)(prim->m_mesh.NumIndices() / 3), (int)prim->m_mesh.NumVertices());
-               if (tmp != NULL)
+               if (doForsyth)
                {
-                  memcpy(prim->m_mesh.m_indices.data(), tmp, prim->m_mesh.NumIndices() * sizeof(unsigned int));
-                  delete[] tmp;
+                   unsigned int* const tmp = reorderForsyth(prim->m_mesh.m_indices, (int)prim->m_mesh.NumVertices());
+                   if (tmp != NULL)
+                   {
+                       memcpy(prim->m_mesh.m_indices.data(), tmp, prim->m_mesh.NumIndices() * sizeof(unsigned int));
+                       delete[] tmp;
+                   }
                }
-               prim->UpdateEditorView();
+               prim->UpdateStatusBarInfo();
                prim = NULL;
                EndDialog(hwndDlg, TRUE);
             }
@@ -1887,26 +1878,28 @@ INT_PTR CALLBACK Primitive::ObjImportProc(HWND hwndDlg, UINT uMsg, WPARAM wParam
             if (prim == NULL)
                break;
 
-            char szFileName[MAXSTRING];
-            char szInitialDir[MAXSTRING];
-            int  fileOffset;
-            szFileName[0] = '\0';
-
-            /*const HRESULT hr =*/ LoadValueString("RecentDir", "ImportDir", szInitialDir, MAXSTRING);
-
             SetForegroundWindow(hwndDlg);
-            if (g_pvp->OpenFileDialog(szInitialDir, szFileName, "Wavefront obj file (*.obj)\0*.obj\0", "obj", 0, fileOffset))
+
+            std::vector<std::string> szFileName;
+            char szInitialDir[MAXSTRING];
+
+            HRESULT hr = LoadValueString("RecentDir", "ImportDir", szInitialDir, MAXSTRING);
+            if (hr != S_OK)
+               lstrcpy(szInitialDir, "c:\\Visual Pinball\\Tables\\");
+
+            if (g_pvp->OpenFileDialog(szInitialDir, szFileName, "Wavefront obj file (*.obj)\0*.obj\0", "obj", 0))
             {
-               SetDlgItemText(hwndDlg, IDC_FILENAME_EDIT, szFileName);
-               SaveValueString("RecentDir", "ImportDir", szInitialDir);
-               string filename(szFileName);
-               size_t index = filename.find_last_of('\\');
-               if (index != -1)
+               SetDlgItemText(hwndDlg, IDC_FILENAME_EDIT, szFileName[0].c_str());
+
+               size_t index = szFileName[0].find_last_of('\\');
+               if (index != std::string::npos)
                {
+                  const std::string newInitDir(szFileName[0].substr(0, index));
+                  hr = SaveValueString("RecentDir", "ImportDir", newInitDir);
                   index++;
-                  string name = filename.substr(index, filename.length() - index);
-                  strcpy_s(prim->m_d.m_meshFileName, name.c_str());
+                  prim->m_d.m_meshFileName = szFileName[0].substr(index, szFileName[0].length() - index);
                }
+
                EnableWindow(GetDlgItem(hwndDlg, IDOK), TRUE);
             }
             break;
@@ -1925,7 +1918,7 @@ INT_PTR CALLBACK Primitive::ObjImportProc(HWND hwndDlg, UINT uMsg, WPARAM wParam
 
 bool Primitive::BrowseFor3DMeshFile()
 {
-   DialogBoxParam(g_hinst, MAKEINTRESOURCE(IDD_MESH_IMPORT_DIALOG), g_pvp->GetHwnd(), ObjImportProc, (size_t)this);
+   DialogBoxParam(m_vpinball->theInstance, MAKEINTRESOURCE(IDD_MESH_IMPORT_DIALOG), m_vpinball->GetHwnd(), ObjImportProc, (size_t)this);
 #if 1
    return false;
 #else
@@ -1936,41 +1929,35 @@ bool Primitive::BrowseFor3DMeshFile()
    OPENFILENAME ofn;
    ZeroMemory(&ofn, sizeof(OPENFILENAME));
    ofn.lStructSize = sizeof(OPENFILENAME);
-   ofn.hInstance = g_hinst;
-   ofn.hwndOwner = g_pvp->m_hwnd;
+   ofn.hInstance = m_vpinball->theInstance;
+   ofn.hwndOwner = m_vpinball->m_hwnd;
    // TEXT
    ofn.lpstrFilter = "Wavefront obj file (*.obj)\0*.obj\0";
    ofn.lpstrFile = szFileName;
-   ofn.nMaxFile = MAXSTRING;
+   ofn.nMaxFile = sizeof(szFileName);
    ofn.lpstrDefExt = "obj";
    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
 
    const HRESULT hr = LoadValueString("RecentDir", "ImportDir", szInitialDir, MAXSTRING);
-   char szFoo[MAX_PATH];
-   if (hr == S_OK)
-   {
-      ofn.lpstrInitialDir = szInitialDir;
-   }
-   else
-   {
-      lstrcpy(szFoo, "c:\\");
-      ofn.lpstrInitialDir = szFoo;
-   }
+   if (hr != S_OK)
+       lstrcpy(szInitialDir, "c:\\Visual Pinball\\Tables\\");
+
+   ofn.lpstrInitialDir = szInitialDir;
 
    const int ret = GetOpenFileName(&ofn);
-   string filename(ofn.lpstrFile);
-   size_t index = filename.find_last_of("\\");
-   if (index != -1)
-   {
-      index++;
-      string name = filename.substr(index, filename.length() - index);
-      strcpy_s(m_d.m_meshFileName, name.c_str());
-   }
    if (ret == 0)
+       return false;
+
+   string filename(ofn.lpstrFile);
+   size_t index = filename.find_last_of('\\');
+   if (index != std::string::npos)
    {
-      return false;
+      const std::string newInitDir(szFilename.substr(0, index));
+      SaveValueString("RecentDir", "ImportDir", newInitDir);
+      index++;
+      m_d.m_meshFileName = filename.substr(index, filename.length() - index);
    }
-   SaveValueString("RecentDir", "ImportDir", szInitialDir);
+
    m_mesh.Clear();
    m_d.m_use3DMesh = false;
    if (vertexBuffer)
@@ -1980,14 +1967,14 @@ bool Primitive::BrowseFor3DMeshFile()
    }
    bool flipTV = false;
    bool convertToLeftHanded = false;
-   int ans = MessageBox(g_pvp->m_hwnd, "Do you want to mirror the object?", "Convert coordinate system?", MB_YESNO | MB_DEFBUTTON2);
+   int ans = m_vpinball->MessageBox("Do you want to mirror the object?", "Convert coordinate system?", MB_YESNO | MB_DEFBUTTON2);
    if (ans == IDYES)
    {
       convertToLeftHanded = true;
    }
    else
    {
-      ans = MessageBox(g_pvp->m_hwnd, "Do you want to convert texture coordinates?", "Confirm", MB_YESNO | MB_DEFBUTTON2);
+      ans = m_vpinball->MessageBox("Do you want to convert texture coordinates?", "Confirm", MB_YESNO | MB_DEFBUTTON2);
       if (ans == IDYES)
       {
          flipTV = true;
@@ -2002,7 +1989,7 @@ bool Primitive::BrowseFor3DMeshFile()
       m_d.m_vSize.y = 1.0f;
       m_d.m_vSize.z = 1.0f;
       m_d.m_use3DMesh = true;
-      UpdateEditorView();
+      UpdateStatusBarInfo();
       return true;
    }
    return false;
@@ -2015,9 +2002,8 @@ bool Primitive::BrowseFor3DMeshFile()
 
 STDMETHODIMP Primitive::get_Image(BSTR *pVal)
 {
-   WCHAR wz[512];
-
-   MultiByteToWideChar(CP_ACP, 0, m_d.m_szImage, -1, wz, MAXNAMEBUFFER);
+   WCHAR wz[MAXTOKEN];
+   MultiByteToWideChar(CP_ACP, 0, m_d.m_szImage.c_str(), -1, wz, MAXTOKEN);
    *pVal = SysAllocString(wz);
    return S_OK;
 }
@@ -2025,23 +2011,22 @@ STDMETHODIMP Primitive::get_Image(BSTR *pVal)
 STDMETHODIMP Primitive::put_Image(BSTR newVal)
 {
    char szImage[MAXTOKEN];
-   WideCharToMultiByte(CP_ACP, 0, newVal, -1, szImage, MAXNAMEBUFFER, NULL, NULL);
+   WideCharToMultiByte(CP_ACP, 0, newVal, -1, szImage, MAXTOKEN, NULL, NULL);
    const Texture * const tex = m_ptable->GetImage(szImage);
    if (tex && tex->IsHDR())
    {
        ShowError("Cannot use a HDR image (.exr/.hdr) here");
        return E_FAIL;
    }
-
-   strcpy_s(m_d.m_szImage,szImage);
+   m_d.m_szImage = szImage;
 
    return S_OK;
 }
 
 STDMETHODIMP Primitive::get_NormalMap(BSTR *pVal)
 {
-    WCHAR wz[512];
-    MultiByteToWideChar(CP_ACP, 0, m_d.m_szNormalMap, -1, wz, MAXNAMEBUFFER);
+    WCHAR wz[MAXTOKEN];
+    MultiByteToWideChar(CP_ACP, 0, m_d.m_szNormalMap, -1, wz, MAXTOKEN);
     *pVal = SysAllocString(wz);
 
     return S_OK;
@@ -2049,8 +2034,8 @@ STDMETHODIMP Primitive::get_NormalMap(BSTR *pVal)
 
 STDMETHODIMP Primitive::put_NormalMap(BSTR newVal)
 {
-    char szImage[MAXTOKEN];
-    WideCharToMultiByte(CP_ACP, 0, newVal, -1, szImage, MAXNAMEBUFFER, NULL, NULL);
+    char szImage[sizeof(m_d.m_szNormalMap)];
+    WideCharToMultiByte(CP_ACP, 0, newVal, -1, szImage, sizeof(m_d.m_szNormalMap), NULL, NULL);
     const Texture * const tex = m_ptable->GetImage(szImage);
     if (tex && tex->IsHDR())
     {
@@ -2058,15 +2043,15 @@ STDMETHODIMP Primitive::put_NormalMap(BSTR newVal)
         return E_FAIL;
     }
 
-    strcpy_s(m_d.m_szNormalMap, szImage);
+    strncpy_s(m_d.m_szNormalMap, szImage, sizeof(m_d.m_szNormalMap)-1);
 
     return S_OK;
 }
 
 STDMETHODIMP Primitive::get_MeshFileName(BSTR *pVal)
 {
-   WCHAR wz[512];
-   MultiByteToWideChar(CP_ACP, 0, m_d.m_meshFileName, -1, wz, 256);
+   WCHAR wz[MAXSTRING];
+   MultiByteToWideChar(CP_ACP, 0, m_d.m_meshFileName.c_str(), -1, wz, MAXSTRING);
    *pVal = SysAllocString(wz);
 
    return S_OK;
@@ -2074,7 +2059,9 @@ STDMETHODIMP Primitive::get_MeshFileName(BSTR *pVal)
 
 STDMETHODIMP Primitive::put_MeshFileName(BSTR newVal)
 {
-   WideCharToMultiByte(CP_ACP, 0, newVal, -1, m_d.m_meshFileName, 256, NULL, NULL);
+   char buf[MAXSTRING];
+   WideCharToMultiByte(CP_ACP, 0, newVal, -1, buf, MAXSTRING, NULL, NULL);
+   m_d.m_meshFileName = buf;
 
    return S_OK;
 }
@@ -2091,41 +2078,27 @@ bool Primitive::LoadMeshDialog()
 
 void Primitive::ExportMeshDialog()
 {
-   char szFileName[MAXSTRING];
    char szInitialDir[MAXSTRING];
-   szFileName[0] = '\0';
+   HRESULT hr = LoadValueString("RecentDir", "ImportDir", szInitialDir, MAXSTRING);
+   if (hr != S_OK)
+       lstrcpy(szInitialDir, "c:\\Visual Pinball\\Tables\\");
 
-   OPENFILENAME ofn;
-   ZeroMemory(&ofn, sizeof(OPENFILENAME));
-   ofn.lStructSize = sizeof(OPENFILENAME);
-   ofn.hInstance = g_hinst;
-   ofn.hwndOwner = g_pvp->GetHwnd();
-   // TEXT
-   ofn.lpstrFilter = "Wavefront obj file (*.obj)\0*.obj\0";
-   ofn.lpstrFile = szFileName;
-   ofn.nMaxFile = MAXSTRING;
-   ofn.lpstrDefExt = "obj";
-   ofn.Flags = OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
+   std::vector<std::string> szFileName;
+   
+   if (m_vpinball->SaveFileDialog(szInitialDir, szFileName, "Wavefront obj file (*.obj)\0*.obj\0", "obj", OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY))
+   {
+      const size_t index = szFileName[0].find_last_of('\\');
+      if (index != std::string::npos)
+      {
+         const std::string newInitDir(szFileName[0].substr(0, index));
+         hr = SaveValueString("RecentDir", "ImportDir", newInitDir);
+      }
 
-   const HRESULT hr = LoadValueString("RecentDir", "LoadDir", szInitialDir, MAXSTRING);
-   char szFoo[MAX_PATH];
-   if (hr == S_OK)
-   {
-      ofn.lpstrInitialDir = szInitialDir;
-   }
-   else
-   {
-      lstrcpy(szFoo, "c:\\");
-      ofn.lpstrInitialDir = szFoo;
+      char name[sizeof(m_wzName) / sizeof(m_wzName[0])];
+      WideCharToMultiByte(CP_ACP, 0, m_wzName, -1, name, sizeof(name), NULL, NULL);
+      m_mesh.SaveWavefrontObj(szFileName[0], m_d.m_use3DMesh ? name : "Primitive");
    }
 
-   const int ret = GetSaveFileName(&ofn);
-   if (ret == 0)
-      return;
-
-   char name[MAX_PATH];
-   WideCharToMultiByte(CP_ACP, 0, m_wzName, -1, name, MAX_PATH, NULL, NULL);
-   m_mesh.SaveWavefrontObj(ofn.lpstrFile, m_d.m_use3DMesh ? name : "Primitive");
 }
 
 bool Primitive::IsTransparent() const
@@ -2159,9 +2132,6 @@ STDMETHODIMP Primitive::put_Sides(int newVal)
       if (!m_d.m_use3DMesh)
       {
          m_vertexBufferRegenerate = true;
-         CalculateBuiltinOriginal();
-         RecalculateMatrices();
-         TransformVertices();
       }
    }
 
@@ -2170,8 +2140,8 @@ STDMETHODIMP Primitive::put_Sides(int newVal)
 
 STDMETHODIMP Primitive::get_Material(BSTR *pVal)
 {
-   WCHAR wz[512];
-   MultiByteToWideChar(CP_ACP, 0, m_d.m_szMaterial, -1, wz, MAXNAMEBUFFER);
+   WCHAR wz[MAXNAMEBUFFER];
+   MultiByteToWideChar(CP_ACP, 0, m_d.m_szMaterial.c_str(), -1, wz, MAXNAMEBUFFER);
    *pVal = SysAllocString(wz);
 
    return S_OK;
@@ -2179,7 +2149,9 @@ STDMETHODIMP Primitive::get_Material(BSTR *pVal)
 
 STDMETHODIMP Primitive::put_Material(BSTR newVal)
 {
-   WideCharToMultiByte(CP_ACP, 0, newVal, -1, m_d.m_szMaterial, MAXNAMEBUFFER, NULL, NULL);
+   char buf[MAXNAMEBUFFER];
+   WideCharToMultiByte(CP_ACP, 0, newVal, -1, buf, MAXNAMEBUFFER, NULL, NULL);
+   m_d.m_szMaterial = buf;
 
    return S_OK;
 }
@@ -2233,7 +2205,6 @@ STDMETHODIMP Primitive::put_DrawTexturesInside(VARIANT_BOOL newVal)
 STDMETHODIMP Primitive::get_X(float *pVal)
 {
    *pVal = m_d.m_vPosition.x;
-   UpdateMeshInfo();
 
    return S_OK;
 }
@@ -2243,7 +2214,6 @@ STDMETHODIMP Primitive::put_X(float newVal)
    if (m_d.m_vPosition.x != newVal)
    {
       m_d.m_vPosition.x = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2261,7 +2231,6 @@ STDMETHODIMP Primitive::put_Y(float newVal)
    if (m_d.m_vPosition.y != newVal)
    {
       m_d.m_vPosition.y = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2279,7 +2248,6 @@ STDMETHODIMP Primitive::put_Z(float newVal)
    if (m_d.m_vPosition.z != newVal)
    {
       m_d.m_vPosition.z = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2297,7 +2265,6 @@ STDMETHODIMP Primitive::put_Size_X(float newVal)
    if (m_d.m_vSize.x != newVal)
    {
       m_d.m_vSize.x = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2315,7 +2282,6 @@ STDMETHODIMP Primitive::put_Size_Y(float newVal)
    if (m_d.m_vSize.y != newVal)
    {
       m_d.m_vSize.y = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2333,7 +2299,6 @@ STDMETHODIMP Primitive::put_Size_Z(float newVal)
    if (m_d.m_vSize.z != newVal)
    {
       m_d.m_vSize.z = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2360,7 +2325,6 @@ STDMETHODIMP Primitive::put_RotX(float newVal)
    if (m_d.m_aRotAndTra[0] != newVal)
    {
       m_d.m_aRotAndTra[0] = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2387,7 +2351,6 @@ STDMETHODIMP Primitive::put_RotY(float newVal)
    if (m_d.m_aRotAndTra[1] != newVal)
    {
       m_d.m_aRotAndTra[1] = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2414,7 +2377,6 @@ STDMETHODIMP Primitive::put_RotZ(float newVal)
    if (m_d.m_aRotAndTra[2] != newVal)
    {
       m_d.m_aRotAndTra[2] = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2442,7 +2404,6 @@ STDMETHODIMP Primitive::put_TransX(float newVal)
    if (m_d.m_aRotAndTra[3] != newVal)
    {
       m_d.m_aRotAndTra[3] = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2470,7 +2431,6 @@ STDMETHODIMP Primitive::put_TransY(float newVal)
    if (m_d.m_aRotAndTra[4] != newVal)
    {
       m_d.m_aRotAndTra[4] = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2498,7 +2458,6 @@ STDMETHODIMP Primitive::put_TransZ(float newVal)
    if (m_d.m_aRotAndTra[5] != newVal)
    {
       m_d.m_aRotAndTra[5] = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2526,7 +2485,6 @@ STDMETHODIMP Primitive::put_ObjRotX(float newVal)
    if (m_d.m_aRotAndTra[6] != newVal)
    {
       m_d.m_aRotAndTra[6] = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2553,7 +2511,6 @@ STDMETHODIMP Primitive::put_ObjRotY(float newVal)
    if (m_d.m_aRotAndTra[7] != newVal)
    {
       m_d.m_aRotAndTra[7] = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2581,7 +2538,6 @@ STDMETHODIMP Primitive::put_ObjRotZ(float newVal)
    if (m_d.m_aRotAndTra[8] != newVal)
    {
       m_d.m_aRotAndTra[8] = newVal;
-      UpdateEditorView();
    }
 
    return S_OK;
@@ -2833,8 +2789,8 @@ STDMETHODIMP Primitive::put_ReflectionEnabled(VARIANT_BOOL newVal)
 
 STDMETHODIMP Primitive::get_PhysicsMaterial(BSTR *pVal)
 {
-   WCHAR wz[512];
-   MultiByteToWideChar(CP_ACP, 0, m_d.m_szPhysicsMaterial, -1, wz, MAXNAMEBUFFER);
+   WCHAR wz[MAXNAMEBUFFER];
+   MultiByteToWideChar(CP_ACP, 0, m_d.m_szPhysicsMaterial.c_str(), -1, wz, MAXNAMEBUFFER);
    *pVal = SysAllocString(wz);
 
    return S_OK;
@@ -2842,7 +2798,9 @@ STDMETHODIMP Primitive::get_PhysicsMaterial(BSTR *pVal)
 
 STDMETHODIMP Primitive::put_PhysicsMaterial(BSTR newVal)
 {
-   WideCharToMultiByte(CP_ACP, 0, newVal, -1, m_d.m_szPhysicsMaterial, MAXNAMEBUFFER, NULL, NULL);
+   char buf[MAXNAMEBUFFER];
+   WideCharToMultiByte(CP_ACP, 0, newVal, -1, buf, MAXNAMEBUFFER, NULL, NULL);
+   m_d.m_szPhysicsMaterial = buf;
 
    return S_OK;
 }

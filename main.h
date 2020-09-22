@@ -128,6 +128,8 @@ using std::vector;
 #include "pinsound.h"
 #include "pinbinary.h"
 
+#include "extern.h"
+
 #include "vpinball.h"
 #include "pintable.h"
 
@@ -154,10 +156,10 @@ using std::vector;
 
 #include "dragpoint.h"
 #include "timer.h"
-#include "surface.h"
 #include "flipper.h"
 #include "plunger.h"
 #include "textbox.h"
+#include "surface.h"
 #include "dispreel.h"
 #include "lightseq.h"
 #include "bumper.h"
@@ -183,7 +185,21 @@ using std::vector;
 #include "slintf.h"
 #include "trace.h"
 
-#include "extern.h"
+inline void ShowError(const char * const sz)
+{
+   if(g_pvp)
+      g_pvp->MessageBox(sz, "Visual Pinball Error", MB_OK | MB_ICONEXCLAMATION);
+   else
+      MessageBox(NULL, sz, "Visual Pinball Error", MB_OK | MB_ICONEXCLAMATION);
+}
+
+inline void ShowError(const string& sz)
+{
+   if(g_pvp)
+      g_pvp->MessageBox(sz.c_str(), "Visual Pinball Error", MB_OK | MB_ICONEXCLAMATION);
+   else
+      MessageBox(NULL, sz.c_str(), "Visual Pinball Error", MB_OK | MB_ICONEXCLAMATION);
+}
 
 #include "editablereg.h"
 

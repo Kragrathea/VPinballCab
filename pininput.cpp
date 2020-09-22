@@ -270,34 +270,34 @@ BOOL CALLBACK DIEnumJoystickCallback(LPCDIDEVICEINSTANCE lpddi, LPVOID pvRef)
    {
       if (!WzSzStrCmp(dstr.wsz, "PinballWizard"))
       {
-         ppinput->uShockDevice = ppinput->e_JoyCnt;	// remember uShock
-         ppinput->uShockType = USHOCKTYPE_PBWIZARD;  //set type 1 = PinballWizard
+         ppinput->uShockDevice = ppinput->e_JoyCnt; // remember uShock
+         ppinput->uShockType = USHOCKTYPE_PBWIZARD; //set type 1 = PinballWizard
       }
       else if (!WzSzStrCmp(dstr.wsz, "UltraCade Pinball"))
       {
-         ppinput->uShockDevice = ppinput->e_JoyCnt;	// remember uShock
+         ppinput->uShockDevice = ppinput->e_JoyCnt;  // remember uShock
          ppinput->uShockType = USHOCKTYPE_ULTRACADE; //set type 2 = UltraCade Pinball
       }
       else if (!WzSzStrCmp(dstr.wsz, "Microsoft SideWinder Freestyle Pro (USB)"))
       {
-         ppinput->uShockDevice = ppinput->e_JoyCnt;	// remember uShock
-         ppinput->uShockType = USHOCKTYPE_SIDEWINDER;//set type 3 = Microsoft SideWinder Freestyle Pro
+         ppinput->uShockDevice = ppinput->e_JoyCnt;   // remember uShock
+         ppinput->uShockType = USHOCKTYPE_SIDEWINDER; //set type 3 = Microsoft SideWinder Freestyle Pro
       }
       else if (!WzSzStrCmp(dstr.wsz, "VirtuaPin Controller"))
       {
-         ppinput->uShockDevice = ppinput->e_JoyCnt;	// remember uShock
+         ppinput->uShockDevice = ppinput->e_JoyCnt;  // remember uShock
          ppinput->uShockType = USHOCKTYPE_VIRTUAPIN; //set type 4 = VirtuaPin Controller
       }
       else if (!WzSzStrCmp(dstr.wsz, "Pinscape Controller"))
       {
-         ppinput->uShockDevice = ppinput->e_JoyCnt;  // remember uShock
-         ppinput->uShockType = USHOCKTYPE_GENERIC;   //set type = Generic
-         ppinput->m_linearPlunger = 1;               // use linear plunger calibration
+         ppinput->uShockDevice = ppinput->e_JoyCnt; // remember uShock
+         ppinput->uShockType = USHOCKTYPE_GENERIC;  //set type = Generic
+         ppinput->m_linearPlunger = 1;              // use linear plunger calibration
       }
       else
       {
-         ppinput->uShockDevice = ppinput->e_JoyCnt;	// remember uShock
-         ppinput->uShockType = USHOCKTYPE_GENERIC;   //Generic Gamepad
+         ppinput->uShockDevice = ppinput->e_JoyCnt; // remember uShock
+         ppinput->uShockType = USHOCKTYPE_GENERIC;  //Generic Gamepad
       }
    }
    hr = ppinput->m_pJoystick[ppinput->e_JoyCnt]->SetDataFormat(&c_dfDIJoystick);
@@ -540,9 +540,9 @@ void PinInput::Init(const HWND hwnd)
 
    HRESULT hr;
 #ifdef USE_DINPUT8
-   hr = DirectInput8Create(g_hinst, DIRECTINPUT_VERSION, IID_IDirectInput8, (void **)&m_pDI, NULL);
+   hr = DirectInput8Create(g_pvp->theInstance, DIRECTINPUT_VERSION, IID_IDirectInput8, (void **)&m_pDI, NULL);
 #else
-   hr = DirectInputCreate(g_hinst, DIRECTINPUT_VERSION, &m_pDI, NULL);
+   hr = DirectInputCreate(g_pvp->theInstance, DIRECTINPUT_VERSION, &m_pDI, NULL);
 #endif
 
 #ifdef USE_DINPUT_FOR_KEYBOARD
@@ -570,7 +570,8 @@ void PinInput::Init(const HWND hwnd)
       {
          hr = m_pMouse->SetDataFormat(&c_dfDIMouse2);
 
-         //hr = m_pMouse->SetCooperativeLevel(hwnd, DISCL_NONEXCLUSIVE | DISCL_FOREGROUND);
+         hr = m_pMouse->SetCooperativeLevel(hwnd, DISCL_NONEXCLUSIVE | DISCL_FOREGROUND);
+
          DIPROPDWORD dipdwm;
          dipdwm.diph.dwSize = sizeof(DIPROPDWORD);
          dipdwm.diph.dwHeaderSize = sizeof(DIPROPHEADER);
@@ -834,11 +835,7 @@ void PinInput::button_exit(const U32 msecs, const U32 curr_time_msec)
    if (m_exit_stamp &&                         // Initialized.
       (curr_time_msec - m_exit_stamp > msecs)) // Held exit button for number of mseconds.
    {
-      if (uShockType == USHOCKTYPE_ULTRACADE)
-         ExitApp(); //remove pesky exit button
-      else
-         //exit(0); //Close out to desktop
-         g_pvp->Quit();
+      g_pvp->Quit();
    }
 }
 
@@ -992,15 +989,15 @@ void PinInput::ProcessBallControl(const DIDEVICEOBJECTDATA * __restrict input)
 				// it fast from the glass height, so it will appear over any object (or on a raised playfield)
 			
 				Ball * const pBall = g_pplayer->m_pactiveballBC;
-				if (pBall && !pBall->m_frozen)
+				if (pBall && !pBall->m_d.m_frozen)
 				{
-					pBall->m_pos.x = g_pplayer->m_pBCTarget->x;
-					pBall->m_pos.y = g_pplayer->m_pBCTarget->y;
-					pBall->m_pos.z = g_pplayer->m_ptable->m_glassheight;
+					pBall->m_d.m_pos.x = g_pplayer->m_pBCTarget->x;
+					pBall->m_d.m_pos.y = g_pplayer->m_pBCTarget->y;
+					pBall->m_d.m_pos.z = g_pplayer->m_ptable->m_glassheight;
 
-					pBall->m_vel.x = 0.0f;
-					pBall->m_vel.y = 0.0f;
-					pBall->m_vel.z = -1000.0f;
+					pBall->m_d.m_vel.x = 0.0f;
+					pBall->m_d.m_vel.y = 0.0f;
+					pBall->m_d.m_vel.z = -1000.0f;
 				}
 			}
 			m_lastclick_ballcontrol_usec = cur;
@@ -1042,10 +1039,10 @@ void PinInput::ProcessThrowBalls(const DIDEVICEOBJECTDATA * __restrict input)
 			Ball * const pBall = g_pplayer->m_pactiveballBC;
 			if (pBall)
 			{
-				pBall->m_pos.x = vert.x;
-				pBall->m_pos.y = vert.y;
-				pBall->m_vel.x = vx;
-				pBall->m_vel.y = vy;
+				pBall->m_d.m_pos.x = vert.x;
+				pBall->m_d.m_pos.y = vert.y;
+				pBall->m_d.m_vel.x = vx;
+				pBall->m_d.m_vel.y = vy;
 			}
 		}
 		else
@@ -1056,15 +1053,15 @@ void PinInput::ProcessThrowBalls(const DIDEVICEOBJECTDATA * __restrict input)
 				for (size_t i = 0; i < g_pplayer->m_vball.size(); i++)
 				{
 					Ball * const pBall = g_pplayer->m_vball[i];
-					const float dx = fabsf(vertex.x - pBall->m_pos.x);
-					const float dy = fabsf(vertex.y - pBall->m_pos.y);
-					if (dx < pBall->m_radius*2.f && dy < pBall->m_radius*2.f)
+					const float dx = fabsf(vertex.x - pBall->m_d.m_pos.x);
+					const float dy = fabsf(vertex.y - pBall->m_d.m_pos.y);
+					if (dx < pBall->m_d.m_radius*2.f && dy < pBall->m_d.m_radius*2.f)
 					{
 						ballGrabbed = true;
-						pBall->m_pos.x = vert.x;
-						pBall->m_pos.y = vert.y;
-						pBall->m_vel.x = vx;
-						pBall->m_vel.y = vy;
+						pBall->m_d.m_pos.x = vert.x;
+						pBall->m_d.m_pos.y = vert.y;
+						pBall->m_d.m_vel.x = vx;
+						pBall->m_d.m_vel.y = vy;
 						pBall->Init(1.f);
 						break;
 					}
@@ -1087,9 +1084,9 @@ void PinInput::ProcessThrowBalls(const DIDEVICEOBJECTDATA * __restrict input)
         for (size_t i = 0; i < g_pplayer->m_vball.size(); i++)
         {
             Ball * const pBall = g_pplayer->m_vball[i];
-            const float dx = fabsf(vertex.x - pBall->m_pos.x);
-            const float dy = fabsf(vertex.y - pBall->m_pos.y);
-            if (dx < pBall->m_radius*2.f && dy < pBall->m_radius*2.f)
+            const float dx = fabsf(vertex.x - pBall->m_d.m_pos.x);
+            const float dy = fabsf(vertex.y - pBall->m_d.m_pos.y);
+            if (dx < pBall->m_d.m_radius*2.f && dy < pBall->m_d.m_radius*2.f)
             {
                 g_pplayer->DestroyBall(pBall);
                 break;

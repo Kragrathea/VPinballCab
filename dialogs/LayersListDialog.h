@@ -1,10 +1,12 @@
 #ifndef H_LAYERS_LIST_DIALOG
 #define  H_LAYERS_LIST_DIALOG
 
+#include <memory>
+
 class LayerTreeView: public CTreeView
 {
 public:
-    LayerTreeView(){ }
+    LayerTreeView() { m_dragging = false; }
     ~LayerTreeView(){ }
     virtual HTREEITEM       AddItem(HTREEITEM hParent, LPCTSTR text, IEditable * const pedit, int image);
     bool                    AddLayer(const string& name);
@@ -12,6 +14,7 @@ public:
     bool                    ContainsLayer(const string& name) const;
     std::string             GetCurrentLayerName() const;
     HTREEITEM               GetLayerByElement(const IEditable * const pedit);
+    HTREEITEM               GetLayerByItem(HTREEITEM hChildItem);
     HTREEITEM               GetItemByElement(const IEditable * const pedit);
     int                     GetItemCount() const;
     int                     GetLayerCount() const;
@@ -27,6 +30,9 @@ public:
     void                    SetActiveLayer(const string& name);
     HTREEITEM               GetRootItem() { return hRootItem; }
     HTREEITEM               GetCurrentLayerItem() { return hCurrentLayerItem; }
+    HTREEITEM               GetFirstLayer() { return GetChild(hRootItem); }
+    std::string             GetLayerName(HTREEITEM item) { return string(GetItemText(item)); }
+    bool                    PreTranslateMessage(MSG* msg);
 
 protected:
     virtual void OnAttach();
@@ -39,10 +45,19 @@ protected:
     virtual LRESULT OnTVNSelChanged(LPNMTREEVIEW pNMTV);
 
 private:
+    bool AddElementToLayer(const HTREEITEM hLayerItem, const string& name, IEditable* const pedit);
+
     HTREEITEM   hRootItem;
     HTREEITEM   hCurrentLayerItem;
     HTREEITEM   hCurrentElementItem;
     CImageList  m_normalImages;
+    bool        m_dragging;
+    struct  DragItem
+    {
+        HTREEITEM   m_hDragItem;
+        HTREEITEM   m_hDragLayer;
+    };
+    std::vector<std::shared_ptr<DragItem>> m_DragItems;
 };
 
 class LayersListDialog;
@@ -52,9 +67,11 @@ public:
     FilterEditBox() : m_layerDialog(nullptr) {}
     virtual ~FilterEditBox() {}
     void SetDialog(LayersListDialog* dialog) { m_layerDialog = dialog; }
+
 protected:
     virtual LRESULT WndProc(UINT msg, WPARAM wparam, LPARAM lparam);
     virtual BOOL    OnCommand(WPARAM wParam, LPARAM lParam);
+
 private:
     LayersListDialog *m_layerDialog;
 };
@@ -74,6 +91,7 @@ public:
     string GetCurrentSelectedLayerName() const;
     void AddToolTip(const char* const text, HWND parentHwnd, HWND toolTipHwnd, HWND controlHwnd);
     void OnAssignButton();
+    bool PreTranslateMessage(MSG* msg);
 
     void ExpandAll()
     {

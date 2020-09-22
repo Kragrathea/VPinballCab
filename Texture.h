@@ -15,11 +15,11 @@ public:
    };
 
    BaseTexture()
-      : m_width(0), m_height(0), m_realWidth(0), m_realHeight(0), m_format(RGBA)
+      : m_width(0), m_height(0), m_realWidth(0), m_realHeight(0), m_format(RGBA), m_has_alpha(false)
    { }
 
-   BaseTexture(const int w, const int h, const Format format = RGBA)
-      : m_width(w), m_height(h), m_data((format == RGBA ? 4 : 3*4) * (w*h)), m_realWidth(w), m_realHeight(h), m_format(format)
+   BaseTexture(const int w, const int h, const Format format, const bool has_alpha)
+      : m_width(w), m_height(h), m_data((format == RGBA ? 4 : 3*4) * (w*h)), m_realWidth(w), m_realHeight(h), m_format(format), m_has_alpha(has_alpha)
    { }
 
    int width() const   { return m_width; }
@@ -35,15 +35,11 @@ public:
    std::vector<BYTE> m_data;
    int m_realWidth, m_realHeight;
    Format m_format;
+   bool m_has_alpha;
 
-   void SetOpaque();
+   bool Needs_ConvertAlpha_Tonemap() const { return (m_format == RGB_FP) || ((m_format == RGBA) && m_has_alpha); }
 
-   void CopyFrom_Raw(const void* bits)  // copy bits which are already in the right format
-   {
-      memcpy(data(), bits, m_data.size());
-   }
-
-   void CopyTo_ConvertAlpha(BYTE* const __restrict bits) // premultiplies alpha (as Win32 AlphaBlend() wants it like that) OR converts rgb_fp format to 32bits
+   void CopyTo_ConvertAlpha_Tonemap(BYTE* const __restrict bits) const // premultiplies alpha (as Win32 AlphaBlend() wants it like that) OR converts rgb_fp format to 32bits
    {
      if(m_format == RGB_FP) // Tonemap for 8bpc-Display
      {
@@ -56,39 +52,40 @@ public:
 				  const float g = src[o * 3 + 1];
 				  const float b = src[o * 3 + 2];
 				  const float l = r*0.176204f + g*0.812985f + b*0.0108109f;
-				  const float n = (l*0.25f + 1.0f) / (l + 1.0f); // overflow is handled by clamp
-				  bits[o * 4    ] = (BYTE)(clamp(b*n, 0.f, 1.f) * 255.f);
-				  bits[o * 4 + 1] = (BYTE)(clamp(g*n, 0.f, 1.f) * 255.f);
-				  bits[o * 4 + 2] = (BYTE)(clamp(r*n, 0.f, 1.f) * 255.f);
-				  bits[o * 4 + 3] = 255;
+				  const float n = (l*(float)(255.*0.25) + 255.0f) / (l + 1.0f); // simple tonemap and scale by 255, overflow is handled by clamp below
+				  ((DWORD*)bits)[o] =  (int)clamp(b*n, 0.f, 255.f)      |
+				                      ((int)clamp(g*n, 0.f, 255.f)<< 8) |
+				                      ((int)clamp(r*n, 0.f, 255.f)<<16) |
+				                      (                     255u  <<24);
 			  }
       }
 	  else
 	  {
+          if (!m_has_alpha)
+              memcpy(bits, m_data.data(), m_height * pitch());
+          else
 		  if (GetWinVersion() >= 2600) // For everything newer than Windows XP: use the alpha in the bitmap, thus RGB needs to be premultiplied with alpha, due to how AlphaBlend() works
 		  {
 			  unsigned int o = 0;
 			  for (int j = 0; j < m_height; ++j)
 				  for (int i = 0; i < m_width; ++i, ++o)
 				  {
-					  const unsigned int alpha = m_data[o * 4 + 3];
+					  const unsigned int src = ((DWORD*)m_data.data())[o];
+					  const unsigned int alpha = src>>24;
 					  if (alpha == 0) // adds a checkerboard where completely transparent (for the image manager display)
 					  {
-						  const BYTE c = ((((i >> 4) ^ (j >> 4)) & 1) << 7) + 127;
-						  bits[o * 4    ] = c;
-						  bits[o * 4 + 1] = c;
-						  bits[o * 4 + 2] = c;
-						  bits[o * 4 + 3] = 0;
+						  const DWORD c = ((((i >> 4) ^ (j >> 4)) & 1) << 7) + 127;
+						  ((DWORD*)bits)[o] = c | (c<<8) | (c<<16) | (0<<24);
 					  }
 					  else if (alpha != 255) // premultiply alpha for win32 AlphaBlend()
 					  {
-						  bits[o * 4    ] = ((unsigned int)m_data[o * 4    ] * alpha) >> 8;
-						  bits[o * 4 + 1] = ((unsigned int)m_data[o * 4 + 1] * alpha) >> 8;
-						  bits[o * 4 + 2] = ((unsigned int)m_data[o * 4 + 2] * alpha) >> 8;
-						  bits[o * 4 + 3] = alpha;
+						  ((DWORD*)bits)[o] =  (( (src     &0xFF) * alpha) >> 8)      |
+						                      (((((src>> 8)&0xFF) * alpha) >> 8)<< 8) |
+						                      (((((src>>16)&0xFF) * alpha) >> 8)<<16) |
+						                      (                           alpha <<24);
 					  }
 					  else
-						  ((DWORD*)bits)[o] = ((DWORD*)m_data.data())[o];
+						  ((DWORD*)bits)[o] = src;
 				  }
 		  }
 		  else // adds a checkerboard pattern where alpha is set to output bits
@@ -97,25 +94,26 @@ public:
 			  for (int j = 0; j < m_height; ++j)
 				  for (int i = 0; i < m_width; ++i, ++o)
 				  {
-					  const unsigned int alpha = m_data[o * 4 + 3];
+					  const unsigned int src = ((DWORD*)m_data.data())[o];
+					  const unsigned int alpha = src>>24;
 					  if (alpha != 255)
 					  {
 						  const unsigned int c = (((((i >> 4) ^ (j >> 4)) & 1) << 7) + 127) * (255 - alpha);
-						  bits[o * 4    ] = ((unsigned int)m_data[o * 4    ] * alpha + c) >> 8;
-						  bits[o * 4 + 1] = ((unsigned int)m_data[o * 4 + 1] * alpha + c) >> 8;
-						  bits[o * 4 + 2] = ((unsigned int)m_data[o * 4 + 2] * alpha + c) >> 8;
-						  bits[o * 4 + 3] = alpha;
+						  ((DWORD*)bits)[o] =  (( (src     &0xFF) * alpha + c) >> 8)      |
+						                      (((((src>> 8)&0xFF) * alpha + c) >> 8)<< 8) |
+						                      (((((src>>16)&0xFF) * alpha + c) >> 8)<<16) |
+						                      (                               alpha <<24);
 					  }
 					  else
-						  ((DWORD*)bits)[o] = ((DWORD*)m_data.data())[o];
+						  ((DWORD*)bits)[o] = src;
 				  }
 		  }
 	  }
    }
 
    static BaseTexture *CreateFromHBitmap(const HBITMAP hbm);
-   static BaseTexture *CreateFromFile(const char *filename);
-   static BaseTexture *CreateFromFreeImage(FIBITMAP* dib);
+   static BaseTexture *CreateFromFile(const string& filename);
+   static BaseTexture *CreateFromFreeImage(FIBITMAP* dib); // also free's/delete's the dib inside!
    static BaseTexture *CreateFromData(const void *data, const size_t size);
 };
 
@@ -134,10 +132,8 @@ public:
 
    void FreeStuff();
 
-   void EnsureHBitmap();
    void CreateGDIVersion();
 
-   void CreateTextureOffscreen(const int width, const int height);
    BaseTexture *CreateFromHBitmap(const HBITMAP hbm);
    void CreateFromResource(const int id);
 
@@ -176,9 +172,8 @@ public:
    HBITMAP m_hbmGDIVersion; // HBitmap at screen depth and converted/visualized alpha so GDI draws it fast
    PinBinary *m_ppb;  // if this image should be saved as a binary stream, otherwise just LZW compressed from the live bitmap
 
-   char m_szName[MAXTOKEN];
-   char m_szInternalName[MAXTOKEN];
-   char m_szPath[MAX_PATH];
+   string m_szName;
+   string m_szPath;
 
 private:
    HBITMAP m_oldHBM;        // this is to cache the result of SelectObject()

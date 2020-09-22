@@ -29,6 +29,7 @@ enum eObjType : unsigned char
 extern float c_hardScatter;
 
 // forward declarations
+struct BallS;
 class Ball;
 class HitObject;
 
@@ -98,7 +99,7 @@ public:
       m_ObjType(eNull), m_enabled(true), m_fe(false), m_e(false) {}
    virtual ~HitObject() {}
 
-   virtual float HitTest(const Ball * const pball, const float dtime, CollisionEvent& coll) const { return -1.f; } //!! shouldn't need to do this, but for whatever reason there is a pure virtual function call triggered otherwise that refuses to be debugged (all derived classes DO implement this one!)
+   virtual float HitTest(const BallS& ball, const float dtime, CollisionEvent& coll) const { return -1.f; } //!! shouldn't need to do this, but for whatever reason there is a pure virtual function call triggered otherwise that refuses to be debugged (all derived classes DO implement this one!)
    virtual int GetType() const = 0;
    virtual void Collide(const CollisionEvent& coll) = 0;
    virtual void Contact(CollisionEvent& coll, const float dtime); // apply contact forces for the given time interval. Ball, Spinner and Gate do nothing here, Flipper has a specialized handling
@@ -140,17 +141,17 @@ public:
    LineSeg(const Vertex2D& p1, const Vertex2D& p2, const float zlow, const float zhigh)
        : v1(p1), v2(p2)
    {
-      m_hitBBox.zlow = zlow;
+      m_hitBBox.zlow = zlow; //!! abuses the hit bbox to store zlow and zhigh
       m_hitBBox.zhigh = zhigh;
       CalcNormal();
    }
 
-   virtual float HitTest(const Ball * const pball, const float dtime, CollisionEvent& coll) const;
+   virtual float HitTest(const BallS& ball, const float dtime, CollisionEvent& coll) const;
    virtual int GetType() const { return eLineSeg; }
    virtual void Collide(const CollisionEvent& coll);
    virtual void CalcHitBBox();
 
-   float HitTestBasic(const Ball * const pball, const float dtime, CollisionEvent& coll, const bool direction, const bool lateral, const bool rigid) const;
+   float HitTestBasic(const BallS& ball, const float dtime, CollisionEvent& coll, const bool direction, const bool lateral, const bool rigid) const;
    void CalcNormal(); // and also does update length!
 
    Vertex2D normal;
@@ -168,12 +169,12 @@ public:
       m_hitBBox.zhigh = zhigh;
    }
 
-   virtual float HitTest(const Ball * const pball, const float dtime, CollisionEvent& coll) const;
+   virtual float HitTest(const BallS& ball, const float dtime, CollisionEvent& coll) const;
    virtual int GetType() const { return eCircle; }
    virtual void Collide(const CollisionEvent& coll);
    virtual void CalcHitBBox();
 
-   float HitTestBasicRadius(const Ball * const pball, const float dtime, CollisionEvent& coll, const bool direction, const bool lateral, const bool rigid) const;
+   float HitTestBasicRadius(const BallS& ball, const float dtime, CollisionEvent& coll, const bool direction, const bool lateral, const bool rigid) const;
 
    Vertex2D center;
    float radius;
@@ -185,18 +186,16 @@ class HitLineZ : public HitObject
 {
 public:
    HitLineZ() {}
-   HitLineZ(const Vertex2D& xy, const float zlow, const float zhigh) : m_xy(xy)
-   {
-      m_hitBBox.zlow = zlow;
-      m_hitBBox.zhigh = zhigh;
-   }
+   HitLineZ(const Vertex2D& xy, const float zlow, const float zhigh) : m_xy(xy), m_zlow(zlow), m_zhigh(zhigh) {}
 
-   virtual float HitTest(const Ball * const pball, const float dtime, CollisionEvent& coll) const;
+   virtual float HitTest(const BallS& ball, const float dtime, CollisionEvent& coll) const;
    virtual int GetType() const { return eJoint; }
    virtual void Collide(const CollisionEvent& coll);
    virtual void CalcHitBBox();
 
    Vertex2D m_xy;
+   float m_zlow;
+   float m_zhigh;
 };
 
 
@@ -206,7 +205,7 @@ public:
    HitPoint(const Vertex3Ds& p) : m_p(p) {}
    HitPoint(const float x, const float y, const float z) : m_p(Vertex3Ds(x,y,z)) {}
 
-   virtual float HitTest(const Ball * const pball, const float dtime, CollisionEvent& coll) const;
+   virtual float HitTest(const BallS& ball, const float dtime, CollisionEvent& coll) const;
    virtual int GetType() const { return ePoint; }
    virtual void Collide(const CollisionEvent& coll);
    virtual void CalcHitBBox();
@@ -218,4 +217,4 @@ public:
 // Callback for the broadphase collision test.
 // Perform the actual hittest between ball and hit object and update
 // collision information if a hit occurred.
-void DoHitTest(const Ball * const pball, HitObject * const pho, CollisionEvent& coll);
+void DoHitTest(const Ball * const pball, const HitObject * const pho, CollisionEvent& coll);

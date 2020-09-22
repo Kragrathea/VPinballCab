@@ -9,10 +9,10 @@ public:
    Vertex2D m_Center;
    TimerDataRoot m_tdr;
    float m_slingshot_threshold;	// speed at which ball needs to trigger slingshot 
-   char m_szSideImage[MAXTOKEN];
-   char m_szTopMaterial[MAXNAMEBUFFER];
-   char m_szSideMaterial[MAXNAMEBUFFER];
-   char m_szSlingShotMaterial[MAXNAMEBUFFER];
+   std::string m_szSideImage;
+   std::string m_szTopMaterial;
+   std::string m_szSideMaterial;
+   std::string m_szSlingShotMaterial;
    float m_heightbottom;
    float m_heighttop;
    float m_slingshotforce;
@@ -119,6 +119,7 @@ public:
    virtual void SetDefaultPhysics(bool fromMouseClick);
    virtual void ExportMesh(FILE *f);
    virtual void AddPoint(int x, int y, const bool smooth);
+   virtual void UpdateStatusBarInfo();
 
 
    float    GetSlingshotStrength() const { return m_d.m_slingshotforce * (float)(1.0/10.0); }
@@ -143,7 +144,6 @@ private:
 
    void FreeBuffers();
 
-   void UpdateUnitsInfo();
 
    PinTable *m_ptable;
 

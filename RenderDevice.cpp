@@ -336,7 +336,7 @@ int getDisplayList(std::vector<DisplayConfig>& displays)
       std::map<std::string, DisplayConfig>::iterator display = displayMap.find(adapter.DeviceName);
       if (display != displayMap.end()) {
          display->second.adapter = i;
-         strncpy_s(display->second.GPU_Name, adapter.Description, MAX_DEVICE_IDENTIFIER_STRING-1);
+         strncpy_s(display->second.GPU_Name, adapter.Description, sizeof(display->second.GPU_Name)-1);
       }
    }
    SAFE_RELEASE(pD3D);
@@ -643,7 +643,7 @@ void RenderDevice::CreateDevice(int &refreshrate, UINT adapterIndex)
    else
 #endif
    {
-      HRESULT hr = m_pD3D->CreateDevice(
+      hr = m_pD3D->CreateDevice(
          m_adapter,
          devtype,
          m_windowHwnd,
@@ -964,11 +964,19 @@ RenderDevice::~RenderDevice()
    //!! if (m_pD3DDeviceEx == m_pD3DDevice) m_pD3DDevice = NULL; //!! needed for Caligula if m_adapter > 0 ?? weird!! BUT MESSES UP FULLSCREEN EXIT (=hangs)
    SAFE_RELEASE_NO_RCC(m_pD3DDeviceEx);
 #endif
+#ifdef DEBUG_REFCOUNT_TRIGGER
    SAFE_RELEASE(m_pD3DDevice);
+#else
+   FORCE_RELEASE(m_pD3DDevice); //!! why is this necessary for some setups? is the refcount still off for some settings?
+#endif
 #ifdef USE_D3D9EX
    SAFE_RELEASE_NO_RCC(m_pD3DEx);
 #endif
+#ifdef DEBUG_REFCOUNT_TRIGGER
    SAFE_RELEASE(m_pD3D);
+#else
+   FORCE_RELEASE(m_pD3D); //!! why is this necessary for some setups? is the refcount still off for some settings?
+#endif
 
    /*
     * D3D sets the FPU to single precision/round to nearest int mode when it's initialized,
@@ -1762,7 +1770,8 @@ void RenderDevice::GetViewport(ViewPort* p1)
 //
 //
 
-Shader::Shader(RenderDevice *renderDevice)
+Shader::Shader(RenderDevice *renderDevice) : currentMaterial(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX,
+                                                             0xCCCCCCCC, 0xCCCCCCCC, 0xCCCCCCCC, false, false, -FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX)
 {
    m_renderDevice = renderDevice;
    m_shader = 0;
@@ -1779,8 +1788,6 @@ Shader::Shader(RenderDevice *renderDevice)
    currentLightImageMode = ~0u;
    currentLightBackglassMode = ~0u;
    currentTechnique[0] = 0;
-
-   memset(&currentMaterial, 0xCC, sizeof(Material));
 }
 
 Shader::~Shader()

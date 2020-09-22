@@ -3,10 +3,13 @@
 #include "kdtree.h"
 #include "quadtree.h"
 #include <unordered_set>
+#include "Debugger.h"
 
 #define DEFAULT_PLAYER_WIDTH 1024
 #define DEFAULT_PLAYER_FS_WIDTH 1920
 #define DEFAULT_PLAYER_FS_REFRESHRATE 60
+
+constexpr int DBG_SPRITE_SIZE = 1024;
 
 // NOTE that the following four definitions need to be in sync in their order!
 enum EnumAssignKeys
@@ -243,21 +246,25 @@ struct TimerOnOff
    bool m_enabled;
 };
 
-class Player
+class Player : public CWnd
 {
 public:
-   Player(const bool cameraMode, PinTable * const ptable, const HWND hwndProgress, const HWND hwndProgressName, HRESULT &hrInit);
+   Player(const bool cameraMode, PinTable * const ptable);
    virtual ~Player();
+
+   virtual void PreRegisterClass(WNDCLASS& wc);
+   virtual void PreCreate(CREATESTRUCT& cs);
+   virtual void OnInitialUpdate();
+   virtual LRESULT WndProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 private:
    void RenderStaticMirror(const bool onlyBalls);
    void RenderDynamicMirror(const bool onlyBalls);
    void RenderMirrorOverlay();
    void InitBallShader();
-   void InitGameplayWindow();
    void InitKeys();
 
-   void InitStatic(HWND hwndProgress);
+   void InitStatic();
 
    void UpdatePhysics();
 
@@ -270,6 +277,8 @@ private:
    void SSRefl();
    void StereoFXAA(const bool stereo, const bool SMAA, const bool DLAA, const bool NFAA, const bool FXAA1, const bool FXAA2, const bool FXAA3, const bool depth_available);
 
+   void UpdateHUD_IMGUI();
+   void RenderHUD_IMGUI();
    void UpdateHUD();
 
    void PrepareVideoBuffersNormal();
@@ -279,6 +288,7 @@ private:
    void PhysicsSimulateCycle(float dtime);
 
 public:
+   void LockForegroundWindow(const bool enable);
    void Render();
    void RenderDynamics();
 
@@ -316,8 +326,6 @@ public:
    void DMDdraw(const float DMDposx, const float DMDposy, const float DMDwidth, const float DMDheight, const COLORREF DMDcolor, const float intensity);
    void Spritedraw(const float posx, const float posy, const float width, const float height, const COLORREF color, Texture* const tex, const float intensity, const bool backdrop=false);
    void Spritedraw(const float posx, const float posy, const float width, const float height, const COLORREF color, D3DTexture* const tex, const float intensity, const bool backdrop=false);
-
-   HWND m_playfieldHwnd;
 
    Shader      *m_ballShader;
    IndexBuffer *m_ballIndexBuffer;
@@ -373,9 +381,6 @@ public:
    EnumAssignKeys m_rgKeys[eCKeys]; //Player's key assignments
 
    HWND m_hwndDebugOutput;
-   HWND m_hwndDebugger;
-   HWND m_hwndLightDebugger;
-   HWND m_hwndMaterialDebugger;
 
    vector<CLSID*> m_controlclsidsafe; // ActiveX control types which have already been okayed as being safe
 
@@ -514,7 +519,11 @@ private:
    HitQuadtree m_debugoctree;
 
    vector<HitObject*> m_vho_dynamic;
+#ifdef USE_EMBREE
+   HitQuadtree m_hitoctree_dynamic; // should be generated from scratch each time something changes
+#else
    HitKD m_hitoctree_dynamic; // should be generated from scratch each time something changes
+#endif
 
    HitPlane m_hitPlayfield; // HitPlanes cannot be part of octree (infinite size)
    HitPlane m_hitTopGlass;
@@ -584,12 +593,13 @@ private:
    FrameQueueLimiter m_limiter;
 
    // only called from ctor
-   HRESULT Init(PinTable * const ptable, const HWND hwndProgress, const HWND hwndProgressName);
+   HRESULT Init();
    // only called from dtor
    void Shutdown();
 
    void CreateDebugFont();
-   void DebugPrint(int x, int y, LPCSTR text, int stringLen, bool shadow = false);
+   void SetDebugOutputPosition(const float x, const float y);
+   void DebugPrint(int x, int y, LPCSTR text, bool center = false);
 
    void SetScreenOffset(const float x, const float y);     // set render offset in screen coordinates, e.g., for the nudge shake
 
@@ -603,6 +613,7 @@ private:
    unsigned int ProfilingMode();
 
 public:
+   void StopPlayer();
    void ToggleFPS();
    void InitFPS();
    bool ShowFPS();
@@ -632,7 +643,10 @@ public:
    bool m_overwriteBallImages;
    Texture *m_ballImage;
    Texture *m_decalImage;
+   DebuggerDialog m_debuggerDialog;
 
 private:
    ID3DXFont *m_pFont;
+   LPD3DXSPRITE m_fontSprite;
+   RECT     m_fontRect;
 };

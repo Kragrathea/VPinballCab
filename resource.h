@@ -493,7 +493,7 @@
 #define IDD_PROPPLUNGER_PHYSICS         340
 #define IDC_SCREENSHOT                  340
 #define IDS_MAKEACTIVEBALL              340
-#define IDC_MonitorCombo                340
+//#define IDC_MonitorCombo                340
 #define IDC_FUNCTIONLIST                340
 #define IDC_LIGHT_TYPE_CHECKBOX         340
 #define IDC_MATERIAL_COMBO              340
@@ -893,6 +893,7 @@
 #define IDC_ENABLE_SSR                  590
 #define IDC_BLOOM_OFF                   591
 #define IDC_PLUNGERRETRACT              592
+#define IDC_IMPORT_NO_FORSYTH           593
 #define IDD_PROPRUBBER_PHYSICS          602
 #define IDC_RUBBER                      602
 #define IDD_PROPRUBBER_VISUALS          604
@@ -1111,6 +1112,8 @@
 #define IDC_TREE1                       837
 #define IDC_LAYER_TREEVIEW              837
 #define IDC_LAYER_FILTER_STATIC         838
+#define IDC_STATIC_ELEMENT_TYPE         839
+#define ID_APPLY                        840
 #define IDC_LAYBACK_EDIT                1040
 #define IDC_3D_STEREO_SEPARATION_EDIT   1041
 #define IDC_3D_STEREO_ZPD_EDIT          1042
@@ -1289,6 +1292,8 @@
 #define ID_EXPORT_TABLEMESH             33002
 #define ID_ADD_CTRL_POINT               33003
 #define ID_ADD_SMOOTH_CTRL_POINT        33004
+#define ID_TABLE_STOP_PLAY              33005
+#define ID_TABLE_PLAYER_STOPPED         33006
 #define DZVALUE                         65535
 #define DZName                          65535
 
@@ -1298,7 +1303,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        668
 #define _APS_NEXT_COMMAND_VALUE         4024
-#define _APS_NEXT_CONTROL_VALUE         839
+#define _APS_NEXT_CONTROL_VALUE         841
 #define _APS_NEXT_SYMED_VALUE           188
 #endif
 #endif

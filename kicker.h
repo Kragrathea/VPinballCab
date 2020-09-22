@@ -82,6 +82,7 @@ public:
 
    virtual unsigned long long GetMaterialID() const { return m_ptable->GetMaterial(m_d.m_szMaterial)->hash(); }
    virtual ItemTypeEnum HitableGetItemType() const { return eItemKicker; }
+   virtual void UpdateStatusBarInfo();
 
    virtual void WriteRegDefaults();
 
@@ -91,7 +92,6 @@ public:
 
 private:
    void GenerateMesh(Vertex3D_NoTex2 *const buf);
-   void UpdateUnitsInfo();
 
    PinTable *m_ptable;
 
@@ -161,7 +161,7 @@ public:
       m_pkicker = NULL;
    }
 
-   virtual float HitTest(const Ball * const pball, const float dtime, CollisionEvent& coll) const;
+   virtual float HitTest(const BallS& ball, const float dtime, CollisionEvent& coll) const;
    virtual int GetType() const { return eTrigger; }
    virtual void Collide(const CollisionEvent& coll)  { DoCollide(coll.m_ball, coll.m_hitnormal, coll.m_hitflag, false); }
 

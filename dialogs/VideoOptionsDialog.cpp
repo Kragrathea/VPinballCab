@@ -6,7 +6,7 @@
 #define GET_FULLSCREENMODES		WM_USER+101
 #define RESET_SIZELIST_CONTENT	WM_USER+102
 
-const int rgwindowsize[] = { 640, 720, 800, 912, 1024, 1152, 1280, 1600 };  // windowed resolutions for selection list
+static const int rgwindowsize[] = { 640, 720, 800, 912, 1024, 1152, 1280, 1440, 1600, 1920, 2048, 2560, 3440, 3840, 4096, 5120, 6400, 7680, 8192, 11520, 15360 };  // windowed resolutions for selection list
 
 VideoOptionsDialog::VideoOptionsDialog() : CDialog(IDD_VIDEO_OPTIONS)
 {
@@ -102,7 +102,7 @@ void VideoOptionsDialog::ResetVideoPreferences(const unsigned int profile) // 0 
    SendMessage(GetDlgItem(IDC_StretchYes).GetHwnd(), BM_SETCHECK, BST_UNCHECKED, 0);
    SendMessage(GetDlgItem(IDC_StretchMonitor).GetHwnd(), BM_SETCHECK, BST_UNCHECKED, 0);
    SendMessage(GetDlgItem(IDC_StretchNo).GetHwnd(), BM_SETCHECK, BST_CHECKED, 0);
-   SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_SETCURSEL, 1, 0);
+   //SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_SETCURSEL, 1, 0);
    SendMessage(GetDlgItem(IDC_DISPLAY_ID).GetHwnd(), CB_SETCURSEL, 0, 0);
 }
 
@@ -124,10 +124,55 @@ void VideoOptionsDialog::FillVideoModesList(const std::vector<VideoMode>& modes,
    {
       char szT[128];
 
-      if (modes[i].depth) // i.e. is this windowed or not
-         sprintf_s(szT, "%d x %d (%dHz)", modes[i].width, modes[i].height, /*modes[i].depth,*/ modes[i].refreshrate);
+      double aspect = (double)modes[i].width / (double)modes[i].height;
+      const bool portrait = (aspect < 1.);
+      if (portrait)
+         aspect = 1./aspect;
+      double factor = aspect*3.0;
+      int fx,fy;
+      if (factor > 4.0)
+      {
+         factor = aspect*9.0;
+         if ((int)(factor+0.5) == 16)
+         {
+            //16:9
+            fx = 16;
+            fy = 9;
+         }
+         else if ((int)(factor+0.5) == 21)
+         {
+            //21:9
+            fx = 21;
+            fy = 9;
+         }
+         else
+         {
+            factor = aspect*10.0;
+            if ((int)(factor+0.5) == 16)
+            {
+               //16:10
+               fx = 16;
+               fy = 10;
+            }
+            else
+            {
+               //21:10
+               fx = 21;
+               fy = 10;
+            }
+         }
+      }
       else
-         sprintf_s(szT, "%d x %d", modes[i].width, modes[i].height);
+      {
+         //4:3
+         fx = 4;
+         fy = 3;
+      }
+
+      if (modes[i].depth) // i.e. is this windowed or not
+         sprintf_s(szT, "%d x %d (%dHz %d:%d)", modes[i].width, modes[i].height, /*modes[i].depth,*/ modes[i].refreshrate, portrait ? fy : fx, portrait ? fx : fy);
+      else
+         sprintf_s(szT, "%d x %d (%d:%d %s)", modes[i].width, modes[i].height /*,modes[i].depth*/, portrait ? fy : fx, portrait ? fx : fy, portrait ? "Portrait" : "Landscape");
 
       SendMessage(hwndList, LB_ADDSTRING, 0, (LPARAM)szT);
       if (curSelMode) {
@@ -152,7 +197,7 @@ void VideoOptionsDialog::FillVideoModesList(const std::vector<VideoMode>& modes,
 BOOL VideoOptionsDialog::OnInitDialog()
 {
    const HWND hwndDlg = GetHwnd();
-   const HWND toolTipHwnd = CreateWindowEx(NULL, TOOLTIPS_CLASS, NULL, WS_POPUP | TTS_ALWAYSTIP | TTS_BALLOON, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hwndDlg, NULL, g_hinst, NULL);
+   const HWND toolTipHwnd = CreateWindowEx(NULL, TOOLTIPS_CLASS, NULL, WS_POPUP | TTS_ALWAYSTIP | TTS_BALLOON, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, hwndDlg, NULL, g_pvp->theInstance, NULL);
    if (toolTipHwnd)
    {
       SendMessage(toolTipHwnd, TTM_SETMAXTIPWIDTH, 0, 180);
@@ -414,8 +459,8 @@ BOOL VideoOptionsDialog::OnInitDialog()
    }
 
    // set selected Monitors
-   // Monitors: 4:3, 16:9, 16:10, 21:10
-   const int selected = LoadValueIntWithDefault("Player", "BallStretchMonitor", 1); // assume 16:9 as standard
+   // Monitors: 4:3, 16:9, 16:10, 21:10, 21:9
+   /*const int selected = LoadValueIntWithDefault("Player", "BallStretchMonitor", 1); // assume 16:9 as standard
    SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_ADDSTRING, 0, (LPARAM)"4:3");
    SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_ADDSTRING, 0, (LPARAM)"16:9");
    SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_ADDSTRING, 0, (LPARAM)"16:10");
@@ -424,7 +469,9 @@ BOOL VideoOptionsDialog::OnInitDialog()
    SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_ADDSTRING, 0, (LPARAM)"9:16 (R)");
    SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_ADDSTRING, 0, (LPARAM)"10:16 (R)");
    SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_ADDSTRING, 0, (LPARAM)"10:21 (R)");
-   SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_SETCURSEL, selected, 0);
+   SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_ADDSTRING, 0, (LPARAM)"9:21 (R)");
+   SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_ADDSTRING, 0, (LPARAM)"21:9");
+   SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_SETCURSEL, selected, 0);*/
 
    return TRUE;
 }
@@ -437,7 +484,8 @@ INT_PTR VideoOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
       {
          size_t indexcur = -1;
          size_t indx = -1;
-         int widthcur = (int)wParam, heightcur = (int)lParam;
+         const int widthcur  = (int)wParam;
+         const int heightcur = (int)lParam;
 
          SendMessage(GetHwnd(), RESET_SIZELIST_CONTENT, 0, 0);
          HWND hwndList = GetDlgItem(IDC_SIZELIST).GetHwnd();
@@ -445,11 +493,9 @@ INT_PTR VideoOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
          //if (indx == LB_ERR)
          //  indx = 0;
 
-         const size_t csize = sizeof(rgwindowsize) / sizeof(int);
-         int screenwidth;
-         int screenheight;
-         int x, y;
          const int display = (int)SendMessage(GetDlgItem(IDC_DISPLAY_ID).GetHwnd(), CB_GETCURSEL, 0, 0);
+         int screenwidth, screenheight;
+         int x, y;
          getDisplaySetupByID(display, x, y, screenwidth, screenheight);
 
          //if (indx != -1)
@@ -464,11 +510,12 @@ INT_PTR VideoOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
          // 16:10 aspect ratio resolutions: 1280*800, 1440*900, 1680*1050, 1920*1200 and 2560*1600
          // 16:9 aspect ratio resolutions:  1280*720, 1366*768, 1600*900, 1920*1080, 2560*1440 and 3840*2160
-         // 21:9 aspect ratio resolution:   3440*1440
+         // 21:9 aspect ratio resolutions:  3440*1440,2560*1080
+         // 21:10 aspect ratio resolution:  3840*1600
          // 4:3  aspect ratio resolutions:  1280*1024
-         const unsigned int num_portrait_modes = 15;
-         const int portrait_modes_width[num_portrait_modes] =  { 720, 720, 1024, 768, 800, 900, 900,1050,1050,1080,1200,1440,1440,1600,2160};
-         const int portrait_modes_height[num_portrait_modes] = {1024,1280, 1280,1366,1280,1440,1600,1600,1680,1920,1920,2560,3440,2560,3840};
+         const unsigned int num_portrait_modes = 17;
+         const int portrait_modes_width[num_portrait_modes] =  { 720, 720, 1024, 768, 800, 900, 900,1050,1050,1080,1200,1080,1440,1440,1600,1600,2160};
+         const int portrait_modes_height[num_portrait_modes] = {1024,1280, 1280,1366,1280,1440,1600,1600,1680,1920,1920,2560,2560,3440,2560,3840,3840};
 
          for (unsigned int i = 0; i < num_portrait_modes; ++i)
             if ((portrait_modes_width[i] <= screenwidth) && (portrait_modes_height[i] <= screenheight))
@@ -488,17 +535,28 @@ INT_PTR VideoOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
          // add landscape play modes
 
-         for (size_t i = 0; i < csize; ++i)  
+         for (size_t i = 0; i < sizeof(rgwindowsize)/sizeof(int) * 5; ++i)
          {
-            const int xsize = rgwindowsize[i];
-            if ((xsize <= screenwidth) && ((xsize * 3 / 4) <= screenheight))
+            const int xsize = rgwindowsize[i/5];
+            
+            int mulx, divy;
+            switch (i%5)
             {
-               if ((xsize == widthcur) && ((xsize * 3 / 4) == heightcur))
+               case 0: mulx = 3;  divy = 4;  break;
+               case 1: mulx = 9;  divy = 16; break;
+               case 2: mulx = 10; divy = 16; break;
+               case 3: mulx = 9;  divy = 21; break;
+               case 4: mulx = 10; divy = 21; break;
+            }
+
+            if ((xsize <= screenwidth) && ((xsize * mulx / divy) <= screenheight))
+            {
+               if ((xsize == widthcur) && ((xsize * mulx / divy) == heightcur))
                   indx = i + cnt;
 
                VideoMode mode;
                mode.width = xsize;
-               mode.height = xsize * 3 / 4;
+               mode.height = xsize * mulx / divy;
                mode.depth = 0;
                mode.refreshrate = 0;
 
@@ -524,7 +582,7 @@ INT_PTR VideoOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
          {
               sprintf_s(szT, "%d x %d (Windowed Fullscreen)", mode.width, mode.height);
               SendMessage(hwndList, LB_ADDSTRING, 0, (LPARAM)szT);
-              if (indx == -1)
+              if (indx == -1 || (mode.width == widthcur && mode.height == heightcur))
                 indexcur = SendMessage(hwndList, LB_GETCOUNT, 0, 0) - 1;
               else
                 indexcur = indx;
@@ -550,8 +608,7 @@ INT_PTR VideoOptionsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                               sprintf_s(szT, "%d x %d", mode.width, mode.height);
                       }
                       else {
-                          memset(&szTx,'\x0', sizeof(szTx));
-                          strcpy_s(szT, szTx);
+                          strncpy_s(szT, szTx, sizeof(szT)-1);
                       }
 
                       SendMessage(hwndList, LB_INSERTSTRING, cnt - 1, (LPARAM)szT);
@@ -630,12 +687,12 @@ BOOL VideoOptionsDialog::OnCommand(WPARAM wParam, LPARAM lParam)
          OPENFILENAME ofn;
          ZeroMemory(&ofn, sizeof(OPENFILENAME));
          ofn.lStructSize = sizeof(OPENFILENAME);
-         ofn.hInstance = g_hinst;
+         ofn.hInstance = g_pvp->theInstance;
          ofn.hwndOwner = g_pvp->GetHwnd();
          // TEXT
-         ofn.lpstrFilter = "Bitmap, JPEG, PNG, TGA, EXR, HDR Files (.bmp/.jpg/.png/.tga/.exr/.hdr)\0*.bmp;*.jpg;*.jpeg;*.png;*.tga;*.exr;*.hdr\0";
+         ofn.lpstrFilter = "Bitmap, JPEG, PNG, TGA, WEBP, EXR, HDR Files (.bmp/.jpg/.png/.tga/.webp/.exr/.hdr)\0*.bmp;*.jpg;*.jpeg;*.png;*.tga;*.webp;*.exr;*.hdr\0";
          ofn.lpstrFile = szFileName;
-         ofn.nMaxFile = MAXSTRING;
+         ofn.nMaxFile = sizeof(szFileName);
          ofn.lpstrDefExt = "png";
          ofn.Flags = OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
          const int ret = GetOpenFileName(&ofn);
@@ -653,21 +710,21 @@ BOOL VideoOptionsDialog::OnCommand(WPARAM wParam, LPARAM lParam)
          OPENFILENAME ofn;
          ZeroMemory(&ofn, sizeof(OPENFILENAME));
          ofn.lStructSize = sizeof(OPENFILENAME);
-         ofn.hInstance = g_hinst;
+         ofn.hInstance = g_pvp->theInstance;
          ofn.hwndOwner = g_pvp->GetHwnd();
          // TEXT
-         ofn.lpstrFilter = "Bitmap, JPEG, PNG, TGA, EXR, HDR Files (.bmp/.jpg/.png/.tga/.exr/.hdr)\0*.bmp;*.jpg;*.jpeg;*.png;*.tga;*.exr;*.hdr\0";
+         ofn.lpstrFilter = "Bitmap, JPEG, PNG, TGA, WEBP, EXR, HDR Files (.bmp/.jpg/.png/.tga/.webp/.exr/.hdr)\0*.bmp;*.jpg;*.jpeg;*.png;*.tga;*.webp;*.exr;*.hdr\0";
          ofn.lpstrFile = szFileName;
-         ofn.nMaxFile = MAXSTRING;
+         ofn.nMaxFile = sizeof(szFileName);
          ofn.lpstrDefExt = "png";
          ofn.Flags = OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
          const int ret = GetOpenFileName(&ofn);
          if (!ret)
             break;
          SetDlgItemText(IDC_BALL_DECAL_EDIT, szFileName);
+
          break;
       }
-
       case IDC_DISPLAY_ID:
       {
          const size_t checked = SendDlgItemMessage(IDC_FULLSCREEN, BM_GETCHECK, 0, 0);
@@ -746,19 +803,19 @@ void VideoOptionsDialog::OnOK()
 
    CString tmpStr;
    tmpStr = GetDlgItemTextA(IDC_CORRECTION_X);
-   SaveValueString("Player", "BallCorrectionX", tmpStr.c_str());
+   SaveValueString("Player", "BallCorrectionX", tmpStr);
 
    tmpStr = GetDlgItemTextA(IDC_CORRECTION_Y);
-   SaveValueString("Player", "BallCorrectionY", tmpStr.c_str());
+   SaveValueString("Player", "BallCorrectionY", tmpStr);
 
    tmpStr = GetDlgItemTextA(IDC_DN_LONGITUDE);
-   SaveValueString("Player", "Longitude", tmpStr.c_str());
+   SaveValueString("Player", "Longitude", tmpStr);
 
    tmpStr = GetDlgItemTextA(IDC_DN_LATITUDE);
-   SaveValueString("Player", "Latitude", tmpStr.c_str());
+   SaveValueString("Player", "Latitude", tmpStr);
 
    tmpStr = GetDlgItemTextA(IDC_NUDGE_STRENGTH);
-   SaveValueString("Player", "NudgeStrength", tmpStr.c_str());
+   SaveValueString("Player", "NudgeStrength", tmpStr);
 
    const HWND hwndFXAA = GetDlgItem(IDC_FXAACB).GetHwnd();
    size_t fxaa = SendMessage(hwndFXAA, CB_GETCURSEL, 0, 0);
@@ -812,13 +869,13 @@ void VideoOptionsDialog::OnOK()
    SaveValueInt("Player", "AlphaRampAccuracy", (int)alphaRampsAccuracy);
 
    tmpStr = GetDlgItemTextA(IDC_3D_STEREO_OFS);
-   SaveValueString("Player", "Stereo3DOffset", tmpStr.c_str());
+   SaveValueString("Player", "Stereo3DOffset", tmpStr);
 
    tmpStr = GetDlgItemTextA(IDC_3D_STEREO_MS);
-   SaveValueString("Player", "Stereo3DMaxSeparation", tmpStr.c_str());
+   SaveValueString("Player", "Stereo3DMaxSeparation", tmpStr);
 
    tmpStr = GetDlgItemTextA(IDC_3D_STEREO_ZPD);
-   SaveValueString("Player", "Stereo3DZPD", tmpStr.c_str());
+   SaveValueString("Player", "Stereo3DZPD", tmpStr);
 
    const bool disableDWM = (SendMessage(GetDlgItem(IDC_DISABLE_DWM).GetHwnd(), BM_GETCHECK, 0, 0) != 0);
    SaveValueBool("Player", "DisableDWM", disableDWM);
@@ -838,20 +895,20 @@ void VideoOptionsDialog::OnOK()
    SaveValueInt("Player", "BallStretchMode", ballStretchMode);
 
    // get selected Monitors
-   // Monitors: 4:3, 16:9, 16:10, 21:10
-   size_t selected = SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_GETCURSEL, 0, 0);
+   // Monitors: 4:3, 16:9, 16:10, 21:10, 21:9
+   /*size_t selected = SendMessage(GetDlgItem(IDC_MonitorCombo).GetHwnd(), CB_GETCURSEL, 0, 0);
    if (selected == LB_ERR)
       selected = 1; // assume a 16:9 Monitor as standard
-   SaveValueInt("Player", "BallStretchMonitor", (int)selected);
+   SaveValueInt("Player", "BallStretchMonitor", (int)selected);*/
 
    const bool overwriteEnabled = IsDlgButtonChecked(IDC_OVERWRITE_BALL_IMAGE_CHECK) == BST_CHECKED;
    if (overwriteEnabled)
    {
       SaveValueBool("Player", "OverwriteBallImage", true);
       tmpStr = GetDlgItemText(IDC_BALL_IMAGE_EDIT);
-      SaveValueString("Player", "BallImage", tmpStr.c_str());
+      SaveValueString("Player", "BallImage", tmpStr);
       tmpStr = GetDlgItemText(IDC_BALL_DECAL_EDIT);
-      SaveValueString("Player", "DecalImage", tmpStr.c_str());
+      SaveValueString("Player", "DecalImage", tmpStr);
    }
    else
       SaveValueBool("Player", "OverwriteBallImage", false);

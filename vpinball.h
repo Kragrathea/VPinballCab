@@ -55,13 +55,11 @@ public:
     
    VPinball();
    virtual ~VPinball();
-
-   void Init();
    void Quit();
 
-private:
-   void CreateMDIClient();
+   void ShowSubDialog(CDialog& dlg);
 
+private:
    void ShowSearchSelect();
    void SetDefaultPhysics();
    void SetViewSolidOutline(size_t viewId);
@@ -78,21 +76,16 @@ private:
    void InitRegValues();
    bool CanClose();
    void GetMyPath();
-   void UpdateRecentFileList(char *szfilename);
+   void UpdateRecentFileList(const string& szfilename);
 
    bool ApcHost_OnTranslateMessage(MSG* pmsg);
    bool processKeyInputForDialogs(MSG *pmsg);
-
-   void SetEnablePalette();
-
-   void ShowSubDialog(CDialog &dlg);
-
-   void CloseAllDialogs();
 
 
 public:
    void AddMDITable(PinTableMDI* mdiTable);
    CMenu GetMainMenu(int id);
+   void CloseAllDialogs();
    void ToggleScriptEditor();
    void ToggleBackglassView();
    BOOL ParseCommand(size_t code, size_t notify);
@@ -100,7 +93,7 @@ public:
 
    CComObject<PinTable> *GetActiveTable();
    bool LoadFile();
-   void LoadFileName(char *szFileName);
+   void LoadFileName(const string& szFileName, const bool updateEditor);
    void SetClipboard(vector<IStream*> * const pvstm);
 
    void DoPlay(const bool _cameraMode);
@@ -108,11 +101,10 @@ public:
    void SetPosCur(float x, float y);
    void SetObjectPosCur(float x, float y);
    void ClearObjectPosCur();
-   float ConvertToUnit(const float value);
-   void SetPropSel(VectorProtected<ISelect> *pvsel);
+   float ConvertToUnit(const float value) const;
+   void SetPropSel(VectorProtected<ISelect> &pvsel);
 
-   void DeletePropSel();
-   void SetActionCur(const char * const szaction);
+   void SetActionCur(const string& szaction);
    void SetCursorCur(HINSTANCE hInstance, LPCTSTR lpCursorName);
 
    STDMETHOD(QueryInterface)(REFIID riid, void** ppvObj);
@@ -128,7 +120,7 @@ public:
 
    bool CloseTable(PinTable * const ppt);
 
-   void SetEnableToolbar();
+   void ToggleToolbar();
    void SetEnableMenuItems();
 
    void EnsureWorkerThread();
@@ -138,11 +130,50 @@ public:
    static void SetOpenMinimized();
    void ShowDrawingOrderDialog(bool select);
 
-   void SetStatusBarElementInfo(const char * const info);
-   void SetStatusBarUnitInfo(const char * const info, const bool isUnit);
+   void SetStatusBarElementInfo(const string& info);
+   void SetStatusBarUnitInfo(const string& info, const bool isUnit) // inlined, in the hope that string conversions will be skipped in case of early out in here
+   {
+    if (g_pplayer)
+        return;
 
-   bool OpenFileDialog(const char *initDir, char *filename, const char *fileFilter, const char *defaultExt, DWORD flags, int &fileOffset);
-   CDockProperty *GetPropertiesDocker();
+    string textBuf;
+
+    if (!info.empty())
+    {
+       textBuf = info;
+       if(isUnit)
+       {
+           switch(m_convertToUnit)
+           {
+               case 0:
+               {
+                   textBuf += " (inch)";
+                   break;
+               }
+               case 1:
+               {
+                   textBuf += " (mm)";
+                   break;
+               }
+               case 2:
+               {
+                   textBuf += " (VPUnits)";
+                   break;
+               }
+               default:
+                   assert(!"wrong unit");
+               break;
+           }
+       }
+    }
+
+    SendMessage(m_hwndStatusBar, SB_SETTEXT, 5 | 0, (size_t)textBuf.c_str());
+   }
+
+   bool OpenFileDialog(const char* const initDir, std::vector<std::string>& filename, const char* const fileFilter, const char* const defaultExt, const DWORD flags);
+   bool SaveFileDialog(const char* const initDir, std::vector<std::string>& filename, const char* const fileFilter, const char* const defaultExt, const DWORD flags);
+
+   CDockProperty* GetPropertiesDocker();
    CDockToolbar *GetToolbarDocker();
    CDockLayers *GetLayersDocker();
    void CreateDocker();
@@ -150,8 +181,11 @@ public:
    {
        return m_layersListDialog;
    }
+   bool IsClosing() const { return m_closing; }
 
    ULONG m_cref;
+
+   HINSTANCE theInstance;
 
    vector< CComObject<PinTable>* > m_vtable;
    CComObject<PinTable> *m_ptableActive;
@@ -188,9 +222,9 @@ public:
 
    int m_securitylevel;
 
-   char m_szMyPath[MAX_PATH];
-   WCHAR m_wzMyPath[MAX_PATH];
-   char m_currentTablePath[MAX_PATH];
+   string m_szMyPath;
+   std::wstring m_wzMyPath;
+   string m_currentTablePath;
 
    int m_autosaveTime;
    static bool m_open_minimized;
@@ -215,21 +249,22 @@ protected:
    virtual BOOL OnCommand(WPARAM wparam, LPARAM lparam);
    virtual LRESULT WndProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
    virtual LRESULT OnMDIActivated(UINT msg, WPARAM wparam, LPARAM lparam);
+   virtual LRESULT OnMDIDestroyed(UINT msg, WPARAM wparam, LPARAM lparam);
    virtual CDocker *NewDockerFromID(int id);
-
 
 private:
 
    CDockProperty *GetDefaultPropertiesDocker();
    CDockLayers *GetDefaultLayersDocker();
    CDockToolbar *GetDefaultToolbarDocker();
-
+   bool m_unloadingTable;
    CMenu m_mainMenu;
-   char m_szRecentTableList[LAST_OPENED_TABLE_COUNT + 1][MAX_PATH];
+   std::vector<std::string> m_recentTableList;
+   //char m_szRecentTableList[LAST_OPENED_TABLE_COUNT + 1][MAX_PATH];
 
    HANDLE m_workerthread;
    unsigned int m_workerthreadid;
-
+   bool    m_closing;
    HMODULE m_scintillaDll;
 
    ImageDialog m_imageMngDlg;
