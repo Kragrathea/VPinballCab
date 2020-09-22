@@ -734,7 +734,7 @@ void Light::PrepareMoversCustom()
       char textBuffer[MAX_PATH];
       WideCharToMultiByte(CP_ACP, 0, m_wzName, -1, name, MAX_PATH, NULL, NULL);
       _snprintf_s(textBuffer, MAX_PATH-1, "%s has an invalid shape! It can not be rendered!", name);
-      ShowError(textBuffer);
+ //     ShowError(textBuffer);
       return;
    }
 
