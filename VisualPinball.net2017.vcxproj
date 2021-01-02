@@ -93,6 +93,7 @@
     <GenerateManifest>true</GenerateManifest>
     <EmbedManifest>true</EmbedManifest>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ExecutablePath>$(DXSDK_DIR)Utilities\Bin\x64;$(ExecutablePath)</ExecutablePath>
@@ -279,8 +280,7 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
       <LargeAddressAware>true</LargeAddressAware>
     </Link>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>copy $(OutputPath)$(TargetFileName) "C:\Games\PinFE\Apps\VisualPinball\VisualPinballCab.exe</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>SubWCRev.exe $(SolutionDir) $(ProjectDir)svn_version.tmpl $(ProjectDir)svn_version.h</Command>
@@ -376,6 +376,7 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
     <ClCompile Include="Dialogs\TableInfoDialog.cpp" />
     <ClCompile Include="dialogs\VideoOptionsDialog.cpp" />
     <ClCompile Include="flasher.cpp" />
+    <ClCompile Include="forceconfig.cpp" />
     <ClCompile Include="hittarget.cpp" />
     <ClCompile Include="inc\gpuprofiler.cpp" />
     <ClCompile Include="inc\miniz.c">
@@ -1094,6 +1095,7 @@ copy "$(TargetPath)" "%25VPIN_DIR%25"
     <ClInclude Include="extern.h" />
     <ClInclude Include="flasher.h" />
     <ClInclude Include="flipper.h" />
+    <ClInclude Include="forceconfig.h" />
     <ClInclude Include="gate.h" />
     <ClInclude Include="hash.h" />
     <ClInclude Include="helpers.h" />

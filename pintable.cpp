@@ -9,7 +9,9 @@
 #include <rapidxml_print.hpp>
 #include <fstream>
 #include <sstream>
+#include "forceconfig.h"
 #include "freeimage.h"
+
 
 using namespace rapidxml;
 
@@ -207,20 +209,54 @@ STDMETHODIMP ScriptGlobalTable::PlayMusic(BSTR str, float volume)
       char szT[512];
       char szPath[MAX_PATH + 512];
 
-      WideCharToMultiByte(CP_ACP, 0, g_pvp->m_wzMyPath, -1, szPath, MAX_PATH, NULL, NULL);
-      WideCharToMultiByte(CP_ACP, 0, str, -1, szT, 512, NULL, NULL);
 
-      char szextension[MAX_PATH];
-      ExtensionFromFilename(szT, szextension);
+	  WideCharToMultiByte(CP_ACP, 0, str, -1, szT, 512, NULL, NULL);
 
-      //ppi->m_ppb;// = new PinBinary();
+	  //force
+	  //first see if music folder is in same path as table
+	  strcpy_s(szPath, g_pvp->m_currentTablePath);
+	  strcat_s(szPath, "Music\\");
+	  strcat_s(szPath, szT);
+	  if (!Exists(szPath)) // We check if there is a table pov settings first
+	  {
+		  szT[0]=0;
+		  szPath[0] = 0;
 
-      lstrcat(szPath, "Music\\");
+		  WideCharToMultiByte(CP_ACP, 0, g_pvp->m_wzMyPath, -1, szPath, MAX_PATH, NULL, NULL);
+		  WideCharToMultiByte(CP_ACP, 0, str, -1, szT, 512, NULL, NULL);
 
-      //WideCharToMultiByte(CP_ACP, 0, str, -1, szT, 512, NULL, NULL);
+		  char szextension[MAX_PATH];
+		  ExtensionFromFilename(szT, szextension);
 
-      // We know that szT can't be more than 512 characters as this point, and that szPath can't be more than MAX_PATH
-      lstrcat(szPath, szT);
+		  //ppi->m_ppb;// = new PinBinary();
+
+		  lstrcat(szPath, "Music\\");
+
+		  //WideCharToMultiByte(CP_ACP, 0, str, -1, szT, 512, NULL, NULL);
+
+		  // We know that szT can't be more than 512 characters as this point, and that szPath can't be more than MAX_PATH
+		  lstrcat(szPath, szT);
+
+		  /*
+		  szPath[0] = 0;
+		  MultiByteToWideChar(CP_ACP, 0, szPath, -1, g_pvp->m_wzMyPath, MAX_PATH);
+		  WideCharToMultiByte(CP_ACP, 0, g_pvp->m_wzMyPath, -1, szPath, MAX_PATH, NULL, NULL);
+
+		  char szextension[MAX_PATH];
+		  ExtensionFromFilename(szT, szextension);
+
+		  //ppi->m_ppb;// = new PinBinary();
+
+		  lstrcat(szPath, "Music\\");
+
+		  //WideCharToMultiByte(CP_ACP, 0, str, -1, szT, 512, NULL, NULL);
+
+		  // We know that szT can't be more than 512 characters as this point, and that szPath can't be more than MAX_PATH
+		  lstrcat(szPath, szT);
+		  */
+	  }
+
+
 
       g_pplayer->m_pxap = new XAudPlayer();
 
@@ -3923,6 +3959,20 @@ bool PinTable::LoadToken(const int id, BiffReader * const pbr)
       pbr->GetBool(&m_BG_enable_FSS);
       if (m_BG_enable_FSS)
          m_BG_current_set = BG_FSS; //!! FSS
+	  if (g_ForceConfig.forceFSS) {
+		  m_BG_enable_FSS = true;
+		  m_BG_current_set = BG_FSS; //fss
+	  }
+
+	  if (g_ForceConfig.forceFS) {
+		  m_BG_enable_FSS = false;
+		  m_BG_current_set = BG_FULLSCREEN; 
+	  }
+
+	  if (g_ForceConfig.forceDT) {
+		  m_BG_enable_FSS = false;
+		  m_BG_current_set = BG_DESKTOP; 
+	  }
       break;
    }
    //case FID(VERS): pbr->GetString(szVersion); break;
